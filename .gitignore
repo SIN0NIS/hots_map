@@ -1,0 +1,10 @@
+# 개인 리플레이 원본 (예제로 고른 것만 samples/ 에 담는다)
+sample_replay/
+
+# 예전 단일 파일 판 (index.html 로 대체됨 — 로컬 보관용)
+replay_tactics_viewer.html
+
+# OS 잡동사니
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>히오스 전장 기록 재생기 + 전술 보드</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>전장 기록 재생기</h1>
+  <span class="map-name" id="mapName"></span>
+  <span class="teams" id="teamInfo"></span>
+  <span class="hgroup">
+    <select id="sampleSel" title="예제 리플레이 (웹 서버로 열었을 때만)"><option value="">샘플 ▾</option></select>
+    <label class="load">리플레이 열기<input type="file" id="file" accept=".json,.StormReplay,application/json"></label>
+    <select id="mapSel" title="배경 맵 선택"></select>
+    <label class="load" id="bgLabel" title="직접 만든 배경(SVG/PNG)을 얹는다">배경 파일<input type="file" id="bgfile" accept=".svg,.png,.jpg,.webp,image/*"></label>
+  </span>
+</header>
+<main>
+  <div id="mapwrap">
+    <div id="stage">
+      <div id="world">
+        <canvas id="cv"></canvas>
+        <canvas id="dc"></canvas>
+        <div id="objs"></div>
+      </div>
+      <div id="zbar"><button id="zo">−</button><span id="zv">100%</span><button id="zi">+</button><button id="fitb">맞춤</button></div>
+      <div id="loading"></div>
+      <button id="tgl">🖌 도구</button>
+      <div id="tbar">
+        <div class="trow1">
+          <button class="it on" data-m="pan" title="이동/선택">✋</button>
+          <button class="it" data-m="pen" title="펜">✏️</button>
+          <button class="it" data-m="ers" title="지우개">🧽</button>
+          <button class="it" data-m="pin" title="핀 (영웅을 고르면 영웅 핀)">📍</button>
+          <button class="it" data-m="tok" title="토큰">♟</button>
+          <button class="it" id="imgbtn" title="이미지 넣기">🖼</button>
+          <div class="sep"></div>
+          <button class="it" id="undo" title="되돌리기 (Ctrl+Z)">↩️</button>
+          <button class="it" id="clrAll" title="모두 지우기 (되돌리기 가능)">🗑</button>
+        </div>
+        <div id="ctx">
+          <div class="crow" id="colors"></div>
+          <div class="trow" id="teamrow" style="display:none">
+            <button class="teamb on" data-t="blue">🔵 BLUE</button>
+            <button class="teamb" data-t="red">🔴 RED</button>
+          </div>
+          <input id="hsearch" type="search" placeholder="영웅 검색 (한/영)" style="display:none" autocomplete="off">
+          <div id="heroes" style="display:none"></div>
+          <span id="szwrap" style="display:none"><input type="range" id="sz" min="2" max="40" value="5"><span id="szv"></span></span>
+          <span id="hint"></span>
+        </div>
+        <input type="file" id="imgfile" accept="image/*" hidden>
+        <input type="file" id="herofile" accept="image/*" multiple hidden>
+      </div>
+      <div id="trash">🗑</div>
+    </div>
+    <div id="controls">
+      <button id="play">▶ 재생</button>
+      <span id="clock">00:00<small>게임 시간</small></span>
+      <input type="range" id="seek" min="0" max="100" value="0" step="0.1" aria-label="타임라인">
+      <button class="spd" data-s="1">×1</button>
+      <button class="spd on" data-s="4">×4</button>
+      <button class="spd" data-s="8">×8</button>
+      <button class="spd" data-s="16">×16</button>
+    </div>
+    <div id="calbar">
+      <label><input type="checkbox" id="showStruct" checked> 구조물</label>
+      <label><input type="checkbox" id="heroIconTgl" checked> 영웅 아이콘</label>
+      <span class="sep2"></span>
+      <span class="cl">배경 월드범위</span>
+      X <input type="number" id="calL" step="1" aria-label="왼쪽"> ~ <input type="number" id="calR" step="1" aria-label="오른쪽">
+      Y <input type="number" id="calB" step="1" aria-label="아래"> ~ <input type="number" id="calT" step="1" aria-label="위">
+      <span class="sep2"></span>
+      <span class="cl">투명도</span> <input type="range" id="bgAlpha" min="0" max="100" value="70" style="width:80px">
+      <span class="cl" id="calHint">🖌 도구를 켜면 맵 위에 그리기·핀·토큰 배치 가능</span>
+    </div>
+  </div>
+  <aside id="side">
+    <h2><button id="sideTgl" title="로그 접기/펴기">▸</button><span class="lbl">이벤트 로그</span></h2>
+    <div id="filters">
+      <button data-f="kill" class="on">킬</button>
+      <button data-f="struct" class="on">건물</button>
+      <button data-f="merc" class="on">용병</button>
+      <button data-f="obj" class="on">오브젝트</button>
+      <button data-f="grow">레벨·특성</button>
+    </div>
+    <div id="log"><div class="empty">재생하면 이벤트가 여기에 표시됩니다</div></div>
+  </aside>
+</main>
+<script src="js/data_maps.js"></script>
+<script src="js/data_heroes.js"></script>
+<script src="js/data_samples.js"></script>
+<script src="js/demo_replay.js"></script>
+<script src="js/py_bundle.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/render.js"></script>
+<script src="js/log.js"></script>
+<script src="js/panzoom.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
