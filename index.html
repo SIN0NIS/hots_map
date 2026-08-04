@@ -6,17 +6,23 @@
 <title>히오스 전장 기록 재생기 + 전술 보드</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-<header>
+<body class="mode-map">
+<nav id="modebar">
   <h1>전장 기록 재생기</h1>
+  <div class="tabs" role="tablist">
+    <button class="tab on" data-mode="map" role="tab">🗺 맵 보기</button>
+    <button class="tab" data-mode="replay" role="tab">▶ 리플레이 보기</button>
+  </div>
   <span class="map-name" id="mapName"></span>
+</nav>
+<header>
   <span class="teams" id="teamInfo"></span>
-  <button id="closeRep" class="mini" title="리플레이를 닫고 맵 보기로 돌아간다">✕ 리플레이 닫기</button>
   <span class="hgroup">
     <select id="sampleSel" title="예제 리플레이"><option value="">예제 ▾</option></select>
-    <label class="load">리플레이 열기<input type="file" id="file" accept=".json,.StormReplay,application/json"></label>
+    <label class="load" id="repLoadLabel">리플레이 열기<input type="file" id="file" accept=".json,.StormReplay,application/json"></label>
     <select id="mapSel" title="배경 맵 선택"></select>
     <label class="load" id="bgLabel" title="직접 만든 배경(SVG/PNG)을 얹는다">배경 파일<input type="file" id="bgfile" accept=".svg,.png,.jpg,.webp,image/*"></label>
+    <button id="closeRep" class="mini" title="리플레이를 닫고 맵 보기로 돌아간다">✕ 리플레이 닫기</button>
   </span>
 </header>
 <main>
@@ -29,6 +35,8 @@
       </div>
       <div id="zbar"><button id="zo">−</button><span id="zv">100%</span><button id="zi">+</button><button id="fitb">맞춤</button></div>
       <div id="loading"></div>
+      <div id="needRep"><b>리플레이를 열어 주세요</b>
+        상단의 «리플레이 열기» 로 .StormReplay 파일을 고르거나<br>«예제 ▾» 에서 하나 골라 보세요</div>
       <button id="tgl">🖌 도구</button>
       <div id="tbar">
         <div class="trow1">
@@ -68,13 +76,17 @@
       <button class="spd" data-s="16">×16</button>
     </div>
     <div id="calbar">
-      <label><input type="checkbox" id="showStruct" checked> 구조물</label>
-      <label><input type="checkbox" id="heroIconTgl" checked> 영웅 아이콘</label>
-      <span class="sep2"></span>
-      <span class="cl">배경 월드범위</span>
-      X <input type="number" id="calL" step="1" aria-label="왼쪽"> ~ <input type="number" id="calR" step="1" aria-label="오른쪽">
-      Y <input type="number" id="calB" step="1" aria-label="아래"> ~ <input type="number" id="calT" step="1" aria-label="위">
-      <span class="sep2"></span>
+      <span id="repToggles">
+        <label><input type="checkbox" id="showStruct" checked> 구조물</label>
+        <label><input type="checkbox" id="heroIconTgl" checked> 영웅 아이콘</label>
+        <span class="sep2"></span>
+      </span>
+      <span id="calGroup">
+        <span class="cl">배경 월드범위</span>
+        X <input type="number" id="calL" step="1" aria-label="왼쪽"> ~ <input type="number" id="calR" step="1" aria-label="오른쪽">
+        Y <input type="number" id="calB" step="1" aria-label="아래"> ~ <input type="number" id="calT" step="1" aria-label="위">
+        <span class="sep2"></span>
+      </span>
       <span class="cl">투명도</span> <input type="range" id="bgAlpha" min="0" max="100" value="70" style="width:80px">
       <span class="cl" id="calHint">🖌 도구를 켜면 맵 위에 그리기·핀·토큰 배치 가능</span>
     </div>

@@ -52,7 +52,9 @@ function draw(){
     ctx.drawImage(bgImg, x1, y1, x2-x1, y2-y1);
     ctx.globalAlpha=1;
   }
-  if(showStruct && G && G.structures){
+  // 리플레이 표기(구조물·이벤트·영웅)는 리플레이 보기에서만 얹는다
+  const repView = !!G && (typeof uiMode==='undefined' || uiMode==='replay');
+  if(showStruct && repView && G.structures){
     for(const s of G.structures){
       const [px,py]=proj(s.x,s.y), dead = s.deathT<=tCur;
       ctx.globalAlpha = dead? .25 : .85;
@@ -81,7 +83,7 @@ function draw(){
   const B=VB;
   for(let x=Math.ceil(B.minX/20)*20;x<=B.maxX;x+=20){const[a,b]=proj(x,B.minY),[c,d]=proj(x,B.maxY);ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke();}
   for(let y=Math.ceil(B.minY/20)*20;y<=B.maxY;y+=20){const[a,b]=proj(B.minX,y),[c,d]=proj(B.maxX,y);ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke();}
-  if(!G) return;                       // 맵만 보는 상태 — 여기까지
+  if(!repView) return;                 // 맵 보기 — 지도와 판서만
   // 최근 이벤트 링
   for(const e of G.evs){
     if(e.t>tCur||tCur-e.t>5) continue;

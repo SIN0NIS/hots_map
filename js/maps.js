@@ -53,8 +53,9 @@ function loadMapBySlug(slug){
     setViewBounds(mapViewBounds(m));
     syncCalInputs(); setupCanvas(); fit();
     hideLoading(); markDirty();
-    setStatus(G ? '배경: '+m.ko+' — 구조물 마커와 어긋나면 배경 월드범위로 미세 조정'
-                : m.ko+' — 끌어서 이동 · 휠로 확대 · 🖌 도구로 전술 작성');
+    setStatus(G && uiMode==='replay'
+      ? '배경: '+m.ko+' — 구조물 마커와 어긋나면 배경 월드범위로 미세 조정'
+      : m.ko+' — 끌어서 이동 · 휠로 확대 · 🖌 도구로 전술 작성');
   };
   img.onerror=()=>{ hideLoading(); setStatus('맵 파일을 읽지 못했습니다: '+m.file); };
   img.src=m.file;

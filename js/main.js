@@ -1,4 +1,33 @@
-/* ================= 조립: 재생 루프 · 컨트롤 · 로드 · 부트 ================= */
+/* ================= 조립: 모드 · 재생 루프 · 컨트롤 · 로드 · 부트 ================= */
+
+/* --- 상단 모드 탭 ---
+   'map'    지도만 본다. 재생바·로그를 감추고 리플레이 표기도 그리지 않는다.
+   'replay' 리플레이를 재생한다. 리플레이의 전장으로 배경을 되돌린다. */
+let uiMode='map';
+let repSlug=null;                 // 지금 열린 리플레이의 전장 (맵 보기에서 딴 맵을 봐도 기억)
+let rosterHTML='';                // 리플레이 보기에서 보여줄 팀 명단
+function setUIMode(m){
+  uiMode=m;
+  document.body.classList.toggle('mode-map', m==='map');
+  document.body.classList.toggle('mode-replay', m==='replay');
+  document.querySelectorAll('#modebar .tab').forEach(b=>
+    b.classList.toggle('on', b.dataset.mode===m));
+  const ti=document.getElementById('teamInfo');
+  if(m==='replay'){
+    // 맵 보기에서 다른 전장을 구경했다면 리플레이의 전장으로 되돌린다
+    if(G && repSlug && repSlug!==curMapSlug) loadMapBySlug(repSlug);
+    setMapLock(!!(G && repSlug));
+    ti.innerHTML = rosterHTML || '';
+  }else{
+    playing=false; playBtn.textContent='▶ 재생';
+    setMapLock(false);                       // 맵 보기에서는 전장을 자유롭게 고른다
+    setTeamHint();                           // 팀 명단은 리플레이 보기에서만
+  }
+  logCount=-1; markDirty();
+  requestAnimationFrame(fit);                // 패널이 접혔다 펴지므로 크기를 다시 잡는다
+}
+document.querySelectorAll('#modebar .tab').forEach(b=>
+  b.onclick=()=>setUIMode(b.dataset.mode));
 
 /* --- 재생 루프 --- */
 const clock=document.getElementById('clock'), seek=document.getElementById('seek'), playBtn=document.getElementById('play');
@@ -10,7 +39,7 @@ function tick(ts){
   }
   lastTs=ts;
   if(needsDraw){
-    if(G){
+    if(G && uiMode==='replay'){
       seek.value=tCur/G.maxT*100;
       clock.firstChild.textContent=fmtT(tCur);
       renderLog();
@@ -48,8 +77,8 @@ function load(raw){
     const hd=heroByName(p.hero);
     return `<span class="hp" title="${p.name}">${hd?`<img src="icons/${hd.icon}" alt="">`:''}${p.hero}</span>`;
   };
-  document.getElementById('teamInfo').innerHTML=
-    `<b class="b">1팀</b> ${t0.map(chip).join('')} <span style="opacity:.5">vs</span> <b class="r">2팀</b> ${t1.map(chip).join('')}`;
+  rosterHTML=`<b class="b">1팀</b> ${t0.map(chip).join('')} <span style="opacity:.5">vs</span> <b class="r">2팀</b> ${t1.map(chip).join('')}`;
+  document.getElementById('teamInfo').innerHTML=rosterHTML;
   // 영웅 미니맵 아이콘 준비 (이름 -> 내장 아이콘)
   for(const lab in G.heroes){
     const h=G.heroes[lab], hd=heroByName(h.heroName);
@@ -57,6 +86,7 @@ function load(raw){
   }
   // 맵 이름으로 배경 자동 선택 + 리플레이의 전장으로 고정
   const m=matchMap(raw.map);
+  repSlug = m ? m.slug : null;
   if(m){
     setMapLock(true);
     if(m.slug!==curMapSlug) loadMapBySlug(m.slug);   // 그림틀·cal 은 여기서 잡는다
@@ -71,30 +101,30 @@ function load(raw){
     }
     syncCalInputs();
   }
-  closeRep.style.display='';
+  document.body.classList.add('has-replay');
+  setUIMode('replay');            // 리플레이를 열면 바로 재생 화면으로
   markDirty(); renderLog();
 }
-/* 리플레이가 아는 전장이면 맵 선택을 잠근다 (어긋난 배경 방지) */
+/* 리플레이 보기에서 전장이 어긋나지 않도록 맵 선택을 잠근다.
+   (맵 보기에서는 항상 풀려 있어 자유롭게 전장을 구경할 수 있다) */
 function setMapLock(on){
   mapSel.disabled=on;
-  mapSel.title=on?'리플레이의 전장으로 고정됨 (리플레이를 닫으면 바꿀 수 있다)':'배경 맵 선택';
-  document.getElementById('bgLabel').style.display=on?'none':'';
+  mapSel.title=on?'리플레이의 전장으로 고정됨 (맵 보기에서는 자유롭게 바꿀 수 있다)':'배경 맵 선택';
 }
 /* 리플레이를 닫고 맵 보기로 돌아간다. 판서·핀은 그대로 둔다 */
 const closeRep=document.getElementById('closeRep');
 closeRep.onclick=()=>{
-  G=null; tCur=0; playing=false; logCount=-1;
+  G=null; repSlug=null; rosterHTML=''; tCur=0; playing=false; logCount=-1;
   playBtn.textContent='▶ 재생'; seek.value=0; clock.firstChild.textContent='00:00';
   document.getElementById('mapName').textContent='';
   setTeamHint();
   logEl.innerHTML='<div class="empty">리플레이를 열면 이벤트가 여기에 표시됩니다</div>';
-  closeRep.style.display='none';
-  setMapLock(false);
-  markDirty();
+  document.body.classList.remove('has-replay');
+  setUIMode('map');
 };
 function setTeamHint(){
   document.getElementById('teamInfo').innerHTML=
-    '<span class="dim">리플레이를 열면 재생됩니다 · 🖌 도구로 전술 작성</span>';
+    '<span class="dim">🖌 도구로 지도 위에 전술을 그릴 수 있습니다</span>';
 }
 
 document.getElementById('file').onchange=async ev=>{
@@ -157,7 +187,7 @@ window.addEventListener('keydown',function(e){
 
 /* --- 부트: 맵 보기로 시작한다 (리플레이를 열면 재생 모드로 바뀐다) --- */
 setTeamHint();
-closeRep.style.display='none';
+setUIMode('map');
 const START_MAP='cursed_hollow';
 const startM=MAP_DB.find(m=>m.slug===START_MAP)||MAP_DB[0];
 if(startM) loadMapBySlug(startM.slug);

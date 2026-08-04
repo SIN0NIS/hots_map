@@ -7,7 +7,20 @@
 /* height 두 줄: iOS 사파리에서 100vh 는 주소창을 뺀 높이라 하단 컨트롤이 바에 가린다.
    dvh 를 뒤에 둬서 지원 브라우저는 이쪽을, 옛 브라우저는 앞줄을 쓴다. */
 body{background:var(--bg);color:var(--ink);font-family:'Pretendard','Malgun Gothic','Segoe UI',sans-serif;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-header{display:flex;align-items:center;gap:14px;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+/* ---- 상단 고정 모드 바 ---- */
+#modebar{flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;
+  height:44px;background:var(--panel);border-bottom:1px solid var(--line)}
+#modebar h1{font-size:14px;font-weight:700;letter-spacing:.06em;white-space:nowrap}
+#modebar .tabs{display:flex;gap:0;align-self:stretch}
+#modebar .tab{background:none;border:none;border-bottom:2px solid transparent;border-radius:0;
+  color:var(--dim);font-family:inherit;font-size:13px;font-weight:600;padding:0 16px;
+  cursor:pointer;white-space:nowrap}
+#modebar .tab:hover{color:var(--ink)}
+#modebar .tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+#modebar .map-name{color:var(--gold);font-size:12px;margin-left:auto;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+header{flex:none;display:flex;align-items:center;gap:14px;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 header h1{font-size:15px;font-weight:700;letter-spacing:.06em}
 header .map-name{color:var(--gold);font-size:13px}
 header .teams{font-size:12px;color:var(--dim)}
@@ -102,7 +115,7 @@ body.objmove .obj{cursor:grab;pointer-events:auto}
 /* ---- 컨트롤 ---- */
 #controls{display:flex;align-items:center;gap:10px}
 button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:4px;
-  font-family:var(--mono);font-size:12px;padding:6px 12px;cursor:pointer}
+  font-family:var(--mono);font-size:12px;padding:6px 12px;cursor:pointer;white-space:nowrap}
 button:hover{border-color:var(--dim)}
 button:focus-visible{outline:2px solid var(--gold)}
 #play{width:74px;font-weight:700}
@@ -127,13 +140,33 @@ button:focus-visible{outline:2px solid var(--gold)}
 #side.collapsed #filters,#side.collapsed #log,#side.collapsed h2 .lbl{display:none}
 #side.collapsed h2{padding:10px 4px;justify-content:center}
 /* 이름 옆 영웅 아이콘 */
-header .hp{display:inline-flex;align-items:center;gap:3px;margin-right:5px}
+header .hp{display:inline-flex;align-items:center;gap:3px;margin-right:5px;
+  flex:none;white-space:nowrap}
+header .teams>b{flex:none;white-space:nowrap}
 header .hp img{width:16px;height:16px;border-radius:50%;border:1px solid var(--line)}
 .ev img.li{width:14px;height:14px;border-radius:50%;vertical-align:-3px;margin-right:2px}
 header select:disabled{opacity:.45;cursor:default}
 header .dim{color:var(--dim)}
 button.mini{font-size:11px;padding:4px 9px;font-family:inherit;color:var(--dim)}
 button.mini:hover{color:var(--ink)}
+
+/* ---- 모드별 표시 ----
+   맵 보기: 지도와 전술 도구만. 재생바·이벤트 로그·리플레이 관련 조작은 감춘다.
+   리플레이 보기: 재생바와 로그가 나오고, 배경을 직접 갈아끼우는 조작은 감춘다. */
+body.mode-map #controls,
+body.mode-map #side,
+body.mode-map #sampleSel,
+body.mode-map #repLoadLabel,
+body.mode-map #repToggles{display:none}
+body.mode-replay #bgLabel{display:none}
+#closeRep{display:none}
+body.mode-replay.has-replay #closeRep{display:inline-block}
+/* 리플레이 보기인데 아직 연 리플레이가 없을 때 안내 */
+#needRep{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;
+  display:none;text-align:center;color:var(--dim);font-size:13px;line-height:1.8;pointer-events:none;
+  background:rgba(14,18,25,.86);border:1px solid var(--line);border-radius:8px;padding:16px 26px}
+body.mode-replay:not(.has-replay) #needRep{display:block}
+#needRep b{color:var(--ink);display:block;font-size:15px;margin-bottom:6px}
 #filters{display:flex;gap:6px;padding:0 14px 10px;flex-wrap:wrap}
 #filters button{font-size:10px;padding:3px 8px;border-radius:10px;color:var(--dim)}
 #filters button.on{color:var(--ink);border-color:var(--gold)}
@@ -148,3 +181,22 @@ button.mini:hover{color:var(--ink)}
 @media (max-width:860px){ main{flex-direction:column}
   #side{width:100%;height:34%;border-left:none;border-top:1px solid var(--line)}
   #side.collapsed{width:100%;min-width:0;height:38px} }
+
+/* 좁은 화면에서는 지도에 자리를 몰아준다. 팀 명단은 한 줄로 옆으로 넘기고,
+   배경 정렬 숫자칸은 감춘다 (내장 전장은 자동 정렬이라 손댈 일이 없다). */
+@media (max-width:640px){
+  #modebar{gap:8px;padding:0 10px}
+  #modebar h1{display:none}
+  #modebar .tab{padding:0 12px}
+  header{padding:6px 10px;gap:8px}
+  header .teams{order:2;width:100%;display:flex;flex-wrap:nowrap;align-items:center;gap:4px;
+    overflow-x:auto;scrollbar-width:none}
+  header .teams::-webkit-scrollbar{display:none}
+  header .hgroup{order:1;margin-left:0;width:100%;gap:6px}
+  header select{flex:1;min-width:0;max-width:none}
+  #calGroup{display:none}
+  #calbar #calHint{width:100%}
+  #mapwrap{padding:6px 8px;gap:6px}
+  #controls{gap:6px} #clock{min-width:72px;font-size:15px}
+  #play{width:56px;padding:6px 6px} .spd{padding:6px 5px;font-size:11px}
+}
