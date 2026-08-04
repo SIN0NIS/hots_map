@@ -4,7 +4,9 @@
   --gold:#e8b64c; --green:#5ad19a; --mono:ui-monospace,'Cascadia Mono','D2Coding',Consolas,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font-family:'Pretendard','Malgun Gothic','Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+/* height 두 줄: iOS 사파리에서 100vh 는 주소창을 뺀 높이라 하단 컨트롤이 바에 가린다.
+   dvh 를 뒤에 둬서 지원 브라우저는 이쪽을, 옛 브라우저는 앞줄을 쓴다. */
+body{background:var(--bg);color:var(--ink);font-family:'Pretendard','Malgun Gothic','Segoe UI',sans-serif;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 header{display:flex;align-items:center;gap:14px;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 header h1{font-size:15px;font-weight:700;letter-spacing:.06em}
 header .map-name{color:var(--gold);font-size:13px}
@@ -129,6 +131,9 @@ header .hp{display:inline-flex;align-items:center;gap:3px;margin-right:5px}
 header .hp img{width:16px;height:16px;border-radius:50%;border:1px solid var(--line)}
 .ev img.li{width:14px;height:14px;border-radius:50%;vertical-align:-3px;margin-right:2px}
 header select:disabled{opacity:.45;cursor:default}
+header .dim{color:var(--dim)}
+button.mini{font-size:11px;padding:4px 9px;font-family:inherit;color:var(--dim)}
+button.mini:hover{color:var(--ink)}
 #filters{display:flex;gap:6px;padding:0 14px 10px;flex-wrap:wrap}
 #filters button{font-size:10px;padding:3px 8px;border-radius:10px;color:var(--dim)}
 #filters button.on{color:var(--ink);border-color:var(--gold)}

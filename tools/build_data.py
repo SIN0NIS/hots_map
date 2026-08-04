@@ -109,6 +109,9 @@ def build_py_bundle():
 
 
 def build_samples():
+    # samples/ 에 무엇을 담을지는 손으로 고르지 말 것. 파일 크기만 보고 고르면
+    # 20초짜리 중단 경기가 뽑힌다 (실제로 한 번 그랬다). 10명 전원이 추적되고
+    # 7~25분이며 이벤트가 넉넉한 것 중 가장 작은 파일을 고른다.
     rows = []
     slug2 = {m[0]: m for m in MAPS}
     d = os.path.join(ROOT, "samples")

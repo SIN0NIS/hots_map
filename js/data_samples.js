@@ -13,17 +13,17 @@ const SAMPLE_DB = [
  {
   "file": "samples/industrial_district.StormReplay",
   "ko": "공업 지구",
-  "kb": 230
+  "kb": 340
  },
  {
   "file": "samples/lost_cavern.StormReplay",
   "ko": "잃어버린 동굴",
-  "kb": 67
+  "kb": 302
  },
  {
   "file": "samples/silver_city.StormReplay",
   "ko": "은빛 도시",
-  "kb": 270
+  "kb": 328
  },
  {
   "file": "samples/sky_temple.StormReplay",

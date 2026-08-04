@@ -11,8 +11,9 @@
   <h1>전장 기록 재생기</h1>
   <span class="map-name" id="mapName"></span>
   <span class="teams" id="teamInfo"></span>
+  <button id="closeRep" class="mini" title="리플레이를 닫고 맵 보기로 돌아간다">✕ 리플레이 닫기</button>
   <span class="hgroup">
-    <select id="sampleSel" title="예제 리플레이 (웹 서버로 열었을 때만)"><option value="">샘플 ▾</option></select>
+    <select id="sampleSel" title="예제 리플레이"><option value="">예제 ▾</option></select>
     <label class="load">리플레이 열기<input type="file" id="file" accept=".json,.StormReplay,application/json"></label>
     <select id="mapSel" title="배경 맵 선택"></select>
     <label class="load" id="bgLabel" title="직접 만든 배경(SVG/PNG)을 얹는다">배경 파일<input type="file" id="bgfile" accept=".svg,.png,.jpg,.webp,image/*"></label>
@@ -87,7 +88,7 @@
       <button data-f="obj" class="on">오브젝트</button>
       <button data-f="grow">레벨·특성</button>
     </div>
-    <div id="log"><div class="empty">재생하면 이벤트가 여기에 표시됩니다</div></div>
+    <div id="log"><div class="empty">리플레이를 열면 이벤트가 여기에 표시됩니다</div></div>
   </aside>
 </main>
 <script src="js/data_maps.js"></script>

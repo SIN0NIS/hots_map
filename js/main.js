@@ -9,10 +9,13 @@ function tick(ts){
     needsDraw=true;
   }
   lastTs=ts;
-  if(G && needsDraw){
-    seek.value=tCur/G.maxT*100;
-    clock.firstChild.textContent=fmtT(tCur);
-    draw(); renderLog();
+  if(needsDraw){
+    if(G){
+      seek.value=tCur/G.maxT*100;
+      clock.firstChild.textContent=fmtT(tCur);
+      renderLog();
+    }
+    draw();
   }
   requestAnimationFrame(tick);
 }
@@ -52,22 +55,46 @@ function load(raw){
     const h=G.heroes[lab], hd=heroByName(h.heroName);
     if(hd){ const im=new Image(); im.src='icons/'+hd.icon; im.onload=markDirty; h.img=im; }
   }
-  cal = { L:Math.round(G.bounds.minX), R:Math.round(G.bounds.maxX),
-          B:Math.round(G.bounds.minY), T:Math.round(G.bounds.maxY) };
-  if(bgAutoCal) cal={...bgAutoCal};
   // 맵 이름으로 배경 자동 선택 + 리플레이의 전장으로 고정
   const m=matchMap(raw.map);
-  if(m && m.slug!==curMapSlug) loadMapBySlug(m.slug);
-  else if(m && bgAutoCal){ cal={...bgAutoCal}; }
-  setMapLock(!!m);
-  syncCalInputs();
-  setupCanvas(); fit(); markDirty(); renderLog();
+  if(m){
+    setMapLock(true);
+    if(m.slug!==curMapSlug) loadMapBySlug(m.slug);   // 그림틀·cal 은 여기서 잡는다
+    else { cal={...bgAutoCal}; syncCalInputs(); }
+  }else{
+    // 뷰어가 모르는 전장 — 리플레이 좌표에 맞춰 틀을 잡는다
+    setMapLock(false);
+    if(!bgImg){
+      cal = { L:Math.round(G.bounds.minX), R:Math.round(G.bounds.maxX),
+              B:Math.round(G.bounds.minY), T:Math.round(G.bounds.maxY) };
+      setViewBounds(G.bounds); setupCanvas(); fit();
+    }
+    syncCalInputs();
+  }
+  closeRep.style.display='';
+  markDirty(); renderLog();
 }
 /* 리플레이가 아는 전장이면 맵 선택을 잠근다 (어긋난 배경 방지) */
 function setMapLock(on){
   mapSel.disabled=on;
-  mapSel.title=on?'리플레이의 전장으로 고정됨':'배경 맵 선택';
+  mapSel.title=on?'리플레이의 전장으로 고정됨 (리플레이를 닫으면 바꿀 수 있다)':'배경 맵 선택';
   document.getElementById('bgLabel').style.display=on?'none':'';
+}
+/* 리플레이를 닫고 맵 보기로 돌아간다. 판서·핀은 그대로 둔다 */
+const closeRep=document.getElementById('closeRep');
+closeRep.onclick=()=>{
+  G=null; tCur=0; playing=false; logCount=-1;
+  playBtn.textContent='▶ 재생'; seek.value=0; clock.firstChild.textContent='00:00';
+  document.getElementById('mapName').textContent='';
+  setTeamHint();
+  logEl.innerHTML='<div class="empty">리플레이를 열면 이벤트가 여기에 표시됩니다</div>';
+  closeRep.style.display='none';
+  setMapLock(false);
+  markDirty();
+};
+function setTeamHint(){
+  document.getElementById('teamInfo').innerHTML=
+    '<span class="dim">리플레이를 열면 재생됩니다 · 🖌 도구로 전술 작성</span>';
 }
 
 document.getElementById('file').onchange=async ev=>{
@@ -82,31 +109,37 @@ document.getElementById('file').onchange=async ev=>{
   }catch(err){ alert('읽기 실패: '+err.message); setStatus(''); }
 };
 
-/* --- 샘플 리플레이 (웹 서버로 열었을 때만 — file:// 는 fetch 불가) --- */
+/* --- 예제 리플레이 --- */
 const sampleSel=document.getElementById('sampleSel');
-if(location.protocol==='file:' || typeof SAMPLE_DB==='undefined' || !SAMPLE_DB.length){
-  sampleSel.style.display='none';
-}else{
+// 데모는 내장 데이터라 파싱도 인터넷도 필요 없다 — file:// 에서도 된다
+if(typeof DEMO_REPLAY!=='undefined' && DEMO_REPLAY){
+  const o=document.createElement('option');
+  o.value='__demo__'; o.textContent='데모: 저주받은 골짜기';
+  sampleSel.appendChild(o);
+}
+// 나머지 예제는 파일을 받아 파싱해야 하므로 웹 서버로 열었을 때만 (file:// 는 fetch 불가)
+if(location.protocol!=='file:' && typeof SAMPLE_DB!=='undefined'){
   for(const s of SAMPLE_DB){
     const o=document.createElement('option');
     o.value=s.file; o.textContent=`${s.ko} (${Math.round(s.kb/100)/10}MB)`;
     sampleSel.appendChild(o);
   }
-  sampleSel.onchange=async ()=>{
-    const f=sampleSel.value; if(!f) return;
-    sampleSel.value='';
-    try{
-      showLoading('샘플 내려받는 중…');
-      const res=await fetch(f);
-      if(!res.ok) throw new Error('HTTP '+res.status);
-      const blob=await res.blob();
-      hideLoading();
-      const raw=await parseReplay(new File([blob], f.split('/').pop()));
-      load(raw);
-      setStatus('파싱 완료 — 재생을 누르세요');
-    }catch(err){ hideLoading(); alert('샘플 로드 실패: '+err.message); setStatus(''); }
-  };
 }
+sampleSel.onchange=async ()=>{
+  const f=sampleSel.value; if(!f) return;
+  sampleSel.value='';
+  if(f==='__demo__'){ load(DEMO_REPLAY); setStatus('데모 리플레이 — 재생을 누르세요'); return; }
+  try{
+    showLoading('샘플 내려받는 중…');
+    const res=await fetch(f);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const blob=await res.blob();
+    hideLoading();
+    const raw=await parseReplay(new File([blob], f.split('/').pop()));
+    load(raw);
+    setStatus('파싱 완료 — 재생을 누르세요');
+  }catch(err){ hideLoading(); alert('샘플 로드 실패: '+err.message); setStatus(''); }
+};
 
 /* --- 키보드 --- */
 window.addEventListener('keydown',function(e){
@@ -122,6 +155,10 @@ window.addEventListener('keydown',function(e){
   else if(e.key==='ArrowLeft'){ tCur=Math.max(0,tCur-5); logCount=-1; markDirty(); }
 });
 
-/* --- 부트: 데모 리플레이 --- */
-if(typeof DEMO_REPLAY!=='undefined' && DEMO_REPLAY) load(DEMO_REPLAY);
+/* --- 부트: 맵 보기로 시작한다 (리플레이를 열면 재생 모드로 바뀐다) --- */
+setTeamHint();
+closeRep.style.display='none';
+const START_MAP='cursed_hollow';
+const startM=MAP_DB.find(m=>m.slug===START_MAP)||MAP_DB[0];
+if(startM) loadMapBySlug(startM.slug);
 requestAnimationFrame(tick);

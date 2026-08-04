@@ -30,6 +30,13 @@ const loadingEl=document.getElementById('loading');
 function showLoading(t){ loadingEl.textContent=t; loadingEl.classList.add('show'); }
 function hideLoading(){ loadingEl.classList.remove('show'); }
 
+/* 화면에 담을 월드 범위: 전장 격자와 그림이 덮는 범위의 교집합.
+   (개별 저장된 난투맵은 그림이 격자 일부만 덮으므로 교집합을 써야 여백이 안 생긴다) */
+function mapViewBounds(m){
+  return { minX: Math.max(0, m.cal.L), maxX: Math.min(m.W, m.cal.R),
+           minY: Math.max(0, m.cal.B), maxY: Math.min(m.H, m.cal.T) };
+}
+
 function loadMapBySlug(slug){
   const m=MAP_DB.find(x=>x.slug===slug);
   if(!m) return;
@@ -40,9 +47,14 @@ function loadMapBySlug(slug){
     if(curMapSlug!==slug) return;          // 그 사이 다른 맵을 골랐다
     bgImg=img;
     bgAutoCal={L:m.cal.L,R:m.cal.R,B:m.cal.B,T:m.cal.T};
-    if(G){ cal={...bgAutoCal}; syncCalInputs(); }
+    cal={...bgAutoCal};
+    // 그림틀은 리플레이가 아니라 맵을 따른다 — 나중에 리플레이를 열어도
+    // 화면이 안 흔들리고, 먼저 그려둔 판서·핀이 제자리에 남는다.
+    setViewBounds(mapViewBounds(m));
+    syncCalInputs(); setupCanvas(); fit();
     hideLoading(); markDirty();
-    setStatus('배경: '+m.ko+' — 구조물 마커와 어긋나면 배경 월드범위로 미세 조정');
+    setStatus(G ? '배경: '+m.ko+' — 구조물 마커와 어긋나면 배경 월드범위로 미세 조정'
+                : m.ko+' — 끌어서 이동 · 휠로 확대 · 🖌 도구로 전술 작성');
   };
   img.onerror=()=>{ hideLoading(); setStatus('맵 파일을 읽지 못했습니다: '+m.file); };
   img.src=m.file;
@@ -53,7 +65,9 @@ function applyBg(url, mapW, mapH, label){
   const img=new Image();
   img.onload=()=>{ bgImg=img;
     if(mapW && mapH){ bgAutoCal={L:0,R:mapW,B:0,T:mapH};
-      if(G){ cal={...bgAutoCal}; syncCalInputs(); }
+      cal={...bgAutoCal};
+      if(!G){ setViewBounds({minX:0,maxX:mapW,minY:0,maxY:mapH}); setupCanvas(); fit(); }
+      syncCalInputs();
       setStatus(`배경 자동 정렬됨: ${label??''} (${mapW}×${mapH})`); }
     else setStatus('구조물 마커가 배경의 건물과 겹치도록 X/Y 범위를 조절하세요');
     markDirty(); };

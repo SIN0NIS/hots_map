@@ -5,6 +5,7 @@ let z=1, ox=0, oy=0;
 function apply(){
   world.style.transform="translate("+ox+"px,"+oy+"px) scale("+z+")";
   document.getElementById('zv').textContent=Math.round(z*100)+"%";
+  markDirty();                          // 영웅 표시는 줌에 맞춰 다시 그려야 한다
   if(typeof ST==='undefined') return;   // tools.js 로드 전 호출 대비 (스크립트 순서 방어)
   ST.objs.forEach(o=>{ if(o.type==='pin') o.el.style.transform="scale("+(1/z)+")"; });
 }
@@ -42,7 +43,10 @@ stage.addEventListener('pointerdown',function(e){
     if(now-lastTap<300){ const r=stage.getBoundingClientRect();
       const mx=e.clientX-r.left, my=e.clientY-r.top;
       const k=z<fitZ()*1.8?2.5:1/2.5;
-      ox=mx-(mx-ox)*k; oy=my-(my-oy)*k; z*=k; apply(); }
+      ox=mx-(mx-ox)*k; oy=my-(my-oy)*k; z*=k; apply();
+      // 줌으로 바뀐 오프셋을 끌기 기준에 다시 넣는다. 안 하면 손가락이 조금만
+      // 움직여도 줌 이전 위치로 되돌아가 화면이 튄다 (터치는 거의 항상 흔들린다).
+      vdrag.ox=ox; vdrag.oy=oy; }
     lastTap=now;
   }
 });
