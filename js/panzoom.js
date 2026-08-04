@@ -5,6 +5,7 @@ let z=1, ox=0, oy=0;
 function apply(){
   world.style.transform="translate("+ox+"px,"+oy+"px) scale("+z+")";
   document.getElementById('zv').textContent=Math.round(z*100)+"%";
+  if(typeof ST==='undefined') return;   // tools.js 로드 전 호출 대비 (스크립트 순서 방어)
   ST.objs.forEach(o=>{ if(o.type==='pin') o.el.style.transform="scale("+(1/z)+")"; });
 }
 function fitZ(){ return Math.min(stage.clientWidth/CW, stage.clientHeight/CH)*0.98; }
