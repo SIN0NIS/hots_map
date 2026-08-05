@@ -167,6 +167,16 @@ const HINTS={
  ers:'문질러서 지우기',
  pin:'탭=핀 추가 · 영웅을 고르면 영웅 핀, ●이면 색 핀',
  tok:'팀·영웅 고르고 탭=배치 · 끌기=맵 이동'};
+/* 지금 «글자를 입력하는 칸»에 포커스가 있나. 태그명만 보면 슬라이더·체크박스를
+   한 번 누른 뒤 단축키가 전부 죽는다 (그것들도 INPUT 이라). */
+function isTypingTarget(){
+  const el=document.activeElement; if(!el) return false;
+  if(el.isContentEditable) return true;
+  const t=el.tagName;
+  if(t==='TEXTAREA'||t==='SELECT') return true;
+  if(t!=='INPUT') return false;
+  return !/^(range|checkbox|radio|button|submit|reset|file|color|image)$/i.test(el.type);
+}
 /* 지금 도구를 마우스 커서로 보여준다 (이모지를 SVG 로 감싸 커서로 쓴다) */
 const CURSOR_ICON={pen:'✏️',ers:'🧽',pin:'📍',tok:'♟'};
 function applyCursor(){
@@ -191,7 +201,8 @@ function setMode(m){
   document.body.classList.toggle('objmove',toolOn&&m!=='pen'&&m!=='ers');
   setSlider(); applyCursor();
 }
-document.querySelectorAll('.it[data-m]').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+// 도구를 고르면 도구도 켠다. 안 그러면 «패널은 열려 있는데 아무것도 안 되는» 상태가 된다.
+document.querySelectorAll('.it[data-m]').forEach(b=>b.onclick=()=>{ setToolOn(true); setMode(b.dataset.m); });
 
 /* 도구를 켜고 끈다. 도구 «패널»과는 따로다 — 패널을 닫아도 도구는 계속 쓸 수 있다. */
 function setToolOn(on){
@@ -333,6 +344,8 @@ document.addEventListener('pointerdown',function(e){
   if(!toolOn) return;
   if(!stage.contains(e.target)) return;
   if(e.target.closest('#zbar')||e.target.closest('#tbar')||e.target.closest('#tgl')) return;
+  if(e.target.closest('#quickmenu')) return;   // 빠른메뉴는 «도구 대상»이 아니다
+  if(qmOpen) closeQuick();                     // 메뉴 밖을 누르면 닫는다
   const p=mapPt(e), o=hit(p);
   if(mode==='pan'){
     if(!o) return;
@@ -456,13 +469,14 @@ function closeQuick(){ qm.classList.remove('on'); qmOpen=false; }
 stage.addEventListener('pointerdown',e=>{ if(qmOpen && !e.target.closest('#quickmenu')) closeQuick(); },true);
 
 window.addEventListener('keydown',e=>{
-  if(/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName||'')) return;
+  if(isTypingTarget()) return;
   if(e.ctrlKey||e.metaKey||e.altKey) return;
   const k=e.key.toLowerCase();
   if(qmOpen){
     const n=parseInt(e.key,10);
     if(n>=1&&n<=QUICK.length){ e.preventDefault(); pickQuick(QUICK[n-1].m); return; }
-    if(k==='escape'||k==='q'){ e.preventDefault(); closeQuick(); return; }
+    // stopImmediatePropagation 이 없으면 main.js 의 Esc(도구 해제)가 이어서 돌아간다
+    if(k==='escape'||k==='q'){ e.preventDefault(); e.stopImmediatePropagation(); closeQuick(); return; }
   }
   if(k==='q'){ e.preventDefault(); qmOpen?closeQuick():openQuick(); return; }
   // 한 글자 단축키 — 패널을 열지 않아도 바로 그 도구가 된다

@@ -72,7 +72,7 @@ function buildPath(pts, maxT){
   const n=Math.floor((maxT+PDT)/PDT)+1;
   const xs=new F(n), ys=new F(n), fl=new U(n);   // fl: 0=없음 1=살아있음 2=사망
   let cx=0, cy=0, has=false, tx=0, ty=0, hasT=false, dead=false, i=0;
-  let sx=0, sy=0, hasS=false;                    // 수렴 중인 전투 스냅샷 목표
+  let sx=0, sy=0, hasS=false, sAge=0;            // 수렴 중인 전투 스냅샷 목표
   let route=null, ri=0;                          // 길찾기 경로와 진행 위치
   let lastFix=-1;                                // 마지막으로 실측 좌표를 적용한 시각
   // 첫 점이 한참 뒤에 있는 리플레이(난투 등)는 그 전 구간이 통째로 비어
@@ -84,7 +84,8 @@ function buildPath(pts, maxT){
     const t=k*PDT;
     while(i<pts.length && pts[i].t<=t){
       const p=pts[i++];
-      if(p.src==='m') setTarget(p.x,p.y);
+      // 새 이동 명령이 오면 스냅샷 수렴은 끝낸다 — 둘이 맞서면 교착에 빠진다(아래 참고)
+      if(p.src==='m'){ setTarget(p.x,p.y); hasS=false; }
       else if(p.src==='j'){                      // 이동기(도약·돌진·점멸) — 바로 옮긴다
         if(has && !dead){ cx=p.x; cy=p.y; hasT=false; hasS=false; route=null; }
       }
@@ -104,7 +105,7 @@ function buildPath(pts, maxT){
       else if(p.src==='c'){
         if(!has){ cx=p.x; cy=p.y; has=true; hasS=false; }
         else if(Math.hypot(p.x-cx,p.y-cy)>SNAP_DIST){ cx=p.x; cy=p.y; hasS=false; route=null; }
-        else { sx=p.x; sy=p.y; hasS=true; }      // 가까우면 부드럽게 끌어당긴다
+        else { sx=p.x; sy=p.y; hasS=true; sAge=0; }   // 가까우면 부드럽게 끌어당긴다
         dead=false;
       }
     }
@@ -112,19 +113,26 @@ function buildPath(pts, maxT){
       if(hasS){                                  // 스냅샷 쪽으로 조금씩 수렴
         cx+=(sx-cx)*CORR; cy+=(sy-cy)*CORR;
         if(Math.hypot(sx-cx,sy-cy)<0.05){ cx=sx; cy=sy; hasS=false; }
+        // 당기는 힘(CORR*거리)과 미는 힘(SPEED*PDT)이 정확히 맞서면 거리 0.55/0.25=2.2
+        // 에서 영영 안 풀린다 — 영웅이 제자리에 못박혔다가 다음 스냅샷에 순간이동했다.
+        // 15스텝(1.5초)이면 수렴은 이미 98.7% 끝났으므로 여기서 끊는다.
+        // 위치는 건드리지 않는다 (스냅시키면 그 자체가 순간이동이 된다).
+        else if(++sAge>=15) hasS=false;
       }
       if(hasT){
         // 목적지가 벽 건너편이면 한 번만 길을 찾아 두고 그 경로를 따라간다
         if(!route && typeof findPath==='function' && !clearLine(cx,cy,tx,ty)){
           route=findPath(cx,cy,tx,ty) || false; ri=0;
         }
-        let step=SPEED*PDT;
+        // 막혔다고 명령을 곧장 버리지 않는다 — 그 자리에서 길을 다시 찾아 본다.
+        // (retry 가 step 을 줄이지 않는 continue 를 2회로 묶어 무한루프를 막는다)
+        let step=SPEED*PDT, retry=2;
         while(step>1e-6){
           const wp = (route && ri<route.length) ? route[ri] : [tx,ty];
           const dx=wp[0]-cx, dy=wp[1]-cy, d=Math.hypot(dx,dy);
           if(d<=step){
-            // 지형을 못 뚫는다. 막혀 있으면 그 자리에서 멈춘다.
             if(canGo(cx,cy,wp[0],wp[1])){ cx=wp[0]; cy=wp[1]; }
+            else if(retry-- > 0 && (route=repathFrom(cx,cy,tx,ty))){ ri=0; continue; }
             else { hasT=false; route=null; break; }
             step-=d;
             if(route && ri<route.length){ ri++; if(ri>=route.length){ route=null; hasT=false; break; } }
@@ -132,6 +140,7 @@ function buildPath(pts, maxT){
           }else{
             const nx=cx+dx/d*step, ny=cy+dy/d*step;
             if(canGo(cx,cy,nx,ny)){ cx=nx; cy=ny; }
+            else if(retry-- > 0 && (route=repathFrom(cx,cy,tx,ty))){ ri=0; continue; }
             else { hasT=false; route=null; }
             break;
           }
@@ -142,9 +151,16 @@ function buildPath(pts, maxT){
   }
   return {n,xs,ys,fl};
 }
-/* 지형 격자가 없으면 늘 통과 (기존 동작 유지) */
+/* 지형 격자가 없으면 늘 통과 (기존 동작 유지).
+   스냅샷 좌표는 정수라 가끔 «벽» 칸 위에 그대로 떨어진다. 그러면 어느 쪽으로도
+   못 나가 다음 스냅샷까지 15초를 그 자리에 못박혔다 (실측 8경기 4건·59.6초).
+   지금 선 칸이 막혀 있으면 «갈 수 있는 칸으로 나가는 이동»은 허용해 빠져나가게
+   한다. 벽 띠를 가로지르지는 못한다. */
 function canGo(x0,y0,x1,y1){
-  return (typeof clearLine!=='function') ? true : clearLine(x0,y0,x1,y1);
+  if(typeof clearLine!=='function') return true;
+  if(typeof walkable==='function' && !walkable(x0,y0))
+    return walkable(x1,y1) || ((x1|0)===(x0|0) && (y1|0)===(y0|0));
+  return clearLine(x0,y0,x1,y1);
 }
 /* 격자 사이를 선형 보간해 돌려준다 — 이것이 «뚝뚝 끊김»을 없애는 핵심이다. */
 function posAt(h, t){

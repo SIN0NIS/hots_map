@@ -18,10 +18,13 @@ function walkable(x, y){
   const i = cy*WALK.W + cx;
   return (WALK.bits[i>>3] >> (7-(i&7)) & 1) === 1;
 }
-/* 두 점 사이가 뚫려 있나 — 0.5칸 간격으로 훑는다 */
+/* 두 점 사이가 뚫려 있나 — 0.1칸 간격으로 훑는다.
+   0.5 로 성기게 보면 simplify 가 «뚫려 있다»고 승인한 지름길을 한 걸음(0.55칸)
+   단위로 다시 볼 때 거부해, 애써 찾은 경로가 중간에 통째로 버려졌다
+   (실측: 경로 중간 중단 253 -> 50회, 오히려 전체 시간도 2137 -> 1793ms). */
 function clearLine(x0,y0,x1,y1){
   const dx=x1-x0, dy=y1-y0, d=Math.hypot(dx,dy);
-  const n=Math.ceil(d/0.5);
+  const n=Math.ceil(d/0.1);
   for(let i=1;i<=n;i++){
     const t=i/n;
     if(!walkable(x0+dx*t, y0+dy*t)) return false;
@@ -65,6 +68,12 @@ function findPath(sx,sy,tx,ty){
   if(pathCache.size>=PATH_CACHE_MAX) pathCache.clear();
   pathCache.set(key,r);
   return r;
+}
+/* 벽에 부딪힌 자리에서의 재탐색. PATH_MIN_DIST 관문을 건너뛴다 —
+   이미 막혀 있으면 목적지가 가까워도 우회로가 필요하다. */
+function repathFrom(sx,sy,tx,ty){
+  if(!WALK || clearLine(sx,sy,tx,ty)) return null;
+  return findPathRaw(sx,sy,tx,ty);
 }
 function findPathRaw(sx,sy,tx,ty){
   const W=WALK.W, H=WALK.H;

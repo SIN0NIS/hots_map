@@ -148,7 +148,10 @@ document.getElementById('snapBoard').onclick=()=>{
   // 한 번에 되돌릴 수 있게 방금 만든 것들을 한 묶음으로 바꿔 넣는다
   ST.hist.length = ST.hist.length - made.length;
   if(made.length) ST.hist.push({t:'addmany', objs:made});
-  setStatus(`현재 배치 ${made.length}명을 보드에 옮겼습니다 — 맵 보기에서도 남습니다 (Ctrl+Z 로 취소)`);
+  // 보드 말은 월드 좌표계라 리플레이 보기에서는 그 위 오버레이의 영웅 아이콘에 완전히
+  // 가려 보이지 않는다. 결과가 실제로 보이는 맵 보기로 넘겨 준다.
+  if(made.length) setUIMode('map');
+  setStatus(`현재 배치 ${made.length}명을 보드로 옮겼습니다 — 맵 보기입니다 (▶ 리플레이 보기로 복귀 · Ctrl+Z 로 취소)`);
 };
 
 function setTeamHint(){
@@ -202,7 +205,7 @@ sampleSel.onchange=async ()=>{
 
 /* --- 키보드 --- */
 window.addEventListener('keydown',function(e){
-  const typing=/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName||'');
+  const typing=isTypingTarget();
   if(toolOn){
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); return; }
     if(e.key==='Escape'){ setMode('pan'); return; }
@@ -210,8 +213,9 @@ window.addEventListener('keydown',function(e){
   }
   if(typing||!G) return;
   if(e.code==='Space'){ e.preventDefault(); playBtn.onclick(); }
-  else if(e.key==='ArrowRight'){ tCur=Math.min(G.maxT,tCur+5); logCount=-1; markDirty(); }
-  else if(e.key==='ArrowLeft'){ tCur=Math.max(0,tCur-5); logCount=-1; markDirty(); }
+  // preventDefault 가 없으면 타임라인에 포커스가 있을 때 range 기본 스텝과 겹쳐 서로 덮어쓴다
+  else if(e.key==='ArrowRight'){ e.preventDefault(); tCur=Math.min(G.maxT,tCur+5); logCount=-1; markDirty(); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); tCur=Math.max(0,tCur-5); logCount=-1; markDirty(); }
 });
 
 /* --- 부트: 맵 보기로 시작한다 (리플레이를 열면 재생 모드로 바뀐다) --- */

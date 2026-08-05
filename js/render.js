@@ -89,7 +89,11 @@ function draw(){
   const OX=(typeof ox==='number')?ox:0, OY=(typeof oy==='number')?oy:0;
   const S=(x,y)=>{ const p=proj(x,y); return [(p[0]*zz+OX)*DPR, (p[1]*zz+OY)*DPR]; };
   const ws=zz*DPR;                     // 지도에 붙어 커지는 것 (구조물·그리드·이벤트 링)
-  const ss=DPR;                        // 화면에서 크기가 일정한 것 (영웅 표시)
+  /* 영웅 표시는 화면에서 크기가 일정하다. 다만 전장 전체가 들어오는 «맞춤» 배율에서는
+     10명이 뭉치면 지름 54px 초상화가 서로를 덮는다 (실측: 프레임의 57.5% 에서 절반 넘게
+     가려짐). 맞춤에서는 55% 로 줄이고, 1.8배 이상 확대하면 원래 크기로 돌아온다. */
+  const fz = (typeof fitZ==='function') ? fitZ() : zz;
+  const ss = DPR * Math.max(0.55, Math.min(1, zz/(fz*1.8)));
   if(showStruct && G.structures){
     for(const s of G.structures){
       const [px,py]=S(s.x,s.y), dead = s.deathT<=tCur;
