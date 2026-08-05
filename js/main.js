@@ -43,7 +43,7 @@ function tick(ts){
     if(G && uiMode==='replay'){
       seek.value=tCur/G.maxT*100;
       clock.firstChild.textContent=fmtT(tCur);
-      renderLog(); updateTeamBar();
+      renderLog(); updateTeamBar(); updateTimeline(); drawXp();
     }
     draw();
   }
@@ -64,6 +64,22 @@ function syncCalInputs(){ if(!cal) return;
 for(const [el,k] of [[calL,'L'],[calR,'R'],[calB,'B'],[calT,'T']])
   el.oninput=()=>{ if(cal){ cal[k]=+el.value; placeBg(); markDirty(); } };
 document.getElementById('bgAlpha').oninput=e=>{ bgAlpha=e.target.value/100; placeBg(); };
+/* 영웅 표시 크기 — 두 보기에서 뜻이 조금 다르다.
+     리플레이 보기: 오버레이 초상화의 «화면 px 반지름» (확대해도 크기가 유지된다)
+     맵 보기: 보드에 옮겨 놓은 영웅 말의 지름 (지도에 붙어 있어 확대하면 같이 커진다)
+   같은 손잡이로 둘 다 다루도록 값을 반지름으로 통일하고, 말은 지름 = 값×2 로 맞춘다. */
+const heroSzEl=document.getElementById('heroSz');
+function applyHeroSize(v){
+  HERO_R=v;
+  heroSzEl.title='영웅 표시 크기 '+v;
+  if(typeof ST!=='undefined'){
+    tokSz = v*2;                         // 앞으로 놓을 말도 같은 크기로
+    for(const o of ST.objs) if(o.type==='tok'&&o.hero) resizeObj(o, v*2);
+  }
+  markDirty();
+}
+heroSzEl.oninput=e=>applyHeroSize(+e.target.value);
+heroSzEl.value=HERO_R;
 document.getElementById('showStruct').onchange=e=>{ showStruct=e.target.checked; markDirty(); };
 document.getElementById('heroIconTgl').onchange=e=>{ showHeroIcons=e.target.checked; markDirty(); };
 
@@ -106,7 +122,7 @@ function load(raw){
     syncCalInputs();
   }
   document.body.classList.add('has-replay');
-  buildTeamBar();
+  buildTeamBar(); buildTimeline();
   setUIMode('replay');            // 리플레이를 열면 바로 재생 화면으로
   markDirty(); renderLog(); updateTeamBar();
 }
@@ -125,33 +141,51 @@ closeRep.onclick=()=>{
   setTeamHint();
   logEl.innerHTML='<div class="empty">리플레이를 열면 이벤트가 여기에 표시됩니다</div>';
   document.body.classList.remove('has-replay');
-  buildTeamBar();
+  buildTeamBar(); buildTimeline();
   setUIMode('map');
 };
 /* 지금 재생 중인 영웅 배치를 전술 보드 말로 굳힌다.
    보드 말은 맵 보기에서도 남으므로, 특정 순간의 구도를 놓고 작전을 그릴 수 있다. */
 document.getElementById('snapBoard').onclick=()=>{
   if(!G) return;
-  const before=ST.objs.length;
   const made=[];
+  const prevTeam=team, prevSel=heroSel;
+  // 1) 영웅 — 살아 있으면 그 자리, 죽어 있으면 죽은 자리에 «회색» 말로
+  let alive=0, dead=0;
   for(const lab in G.heroes){
     const hh=G.heroes[lab], p=posAt(hh,tCur);
-    if(!p||p.dead) continue;
+    if(!p) continue;
     const hd=heroByName(hh.heroName);
     const [px,py]=proj(p.x,p.y);
-    const prevTeam=team, prevSel=heroSel;
     team = hh.team===1?'red':'blue';
     heroSel = hd ? {name:hh.heroName, src:'icons/'+hd.icon} : null;
-    made.push(addTok(px,py));
-    team=prevTeam; heroSel=prevSel;
+    const o=addTok(px,py);
+    if(p.dead){ o.el.classList.add('dead'); o.el.title=hh.heroName+' (사망 중)'; dead++; }
+    else alive++;
+    made.push(o);
+  }
+  team=prevTeam; heroSel=prevSel;
+  // 2) 이 시각까지 파괴된 구조물 — 자리에 ✕ 표식을 남긴다.
+  //    (용병 캠프·정령의 우물은 «파괴»가 아니라 점령/소모라 세지 않는다)
+  let st=0;
+  for(const s of (G.structures||[])){
+    if(!(s.deathT<=tCur)) continue;
+    const m=/Core|King/.test(s.unit) ? {t:'★',c:'core',s:46}
+          : /TownHall/.test(s.unit)  ? {t:'✕',c:'',    s:40}
+          : /CannonTower/.test(s.unit)?{t:'✕',c:'',    s:26} : null;
+    if(!m) continue;
+    const [px,py]=proj(s.x,s.y);
+    made.push(addMark(px,py,m.t,m.c,m.s)); st++;
   }
   // 한 번에 되돌릴 수 있게 방금 만든 것들을 한 묶음으로 바꿔 넣는다
   ST.hist.length = ST.hist.length - made.length;
-  if(made.length) ST.hist.push({t:'addmany', objs:made});
+  if(!made.length){ setStatus('옮길 것이 없습니다'); return; }
+  ST.hist.push({t:'addmany', objs:made});
   // 보드 말은 월드 좌표계라 리플레이 보기에서는 그 위 오버레이의 영웅 아이콘에 완전히
   // 가려 보이지 않는다. 결과가 실제로 보이는 맵 보기로 넘겨 준다.
-  if(made.length) setUIMode('map');
-  setStatus(`현재 배치 ${made.length}명을 보드로 옮겼습니다 — 맵 보기입니다 (▶ 리플레이 보기로 복귀 · Ctrl+Z 로 취소)`);
+  setUIMode('map');
+  setStatus(`${fmtT(tCur)} 상황을 보드로 옮겼습니다 — 영웅 ${alive}명`
+    + (dead?` (사망 ${dead})`:'') + `, 파괴된 구조물 ${st}개 · Ctrl+Z 로 취소`);
 };
 
 function setTeamHint(){

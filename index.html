@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>히오스 전장 기록 재생기 + 전술 보드</title>
-<link rel="stylesheet" href="css/style.css?v=16">
+<link rel="stylesheet" href="css/style.css?v=24">
 </head>
 <body class="mode-map">
 <nav id="modebar">
@@ -15,10 +15,29 @@
   </div>
   <span class="map-name" id="mapName"></span>
 </nav>
-<div id="teambar">
-  <div class="side t0" id="team0"></div>
-  <div class="vs">VS</div>
-  <div class="side t1" id="team1"></div>
+<!-- 게임 화면처럼: 좌 5명 · 가운데 시간/레벨/킬/건물 · 우 5명 -->
+<div id="topbar">
+  <div class="tside t0" id="top0"></div>
+  <div class="tcenter">
+    <div class="score">
+      <div class="sc b">
+        <span class="lv" id="tLv0">1</span>
+        <span class="kb"><b id="tK0">0</b><i>킬</i><b id="tS0">0</b><i>건물</i></span>
+      </div>
+      <span class="clockbig" id="tClock">00:00</span>
+      <div class="sc r">
+        <span class="lv" id="tLv1">1</span>
+        <span class="kb"><b id="tK1">0</b><i>킬</i><b id="tS1">0</b><i>건물</i></span>
+      </div>
+    </div>
+    <div class="pagetabs" id="pageTabs">
+      <button class="on" data-p="tal" title="특성 (1)">특성</button>
+      <button data-p="kda" title="처치 관여 · 데스 (리플레이는 막타를 구분하지 않아 «관여»로 센다)">관여</button>
+      <button data-p="apm" title="APM·사망 시간 (3)">APM</button>
+      <button data-p="xp" title="경험치 내역 (4)">XP</button>
+    </div>
+  </div>
+  <div class="tside t1" id="top1"></div>
 </div>
 <header>
   <span class="teams" id="teamInfo"></span>
@@ -95,11 +114,34 @@
         <span class="sep2"></span>
       </span>
       <span class="cl">투명도</span> <input type="range" id="bgAlpha" min="0" max="100" value="70" style="width:80px">
+      <span class="cl" id="heroSzWrap">영웅 크기 <input type="range" id="heroSz" min="12" max="52" step="1" value="27" style="width:72px" title="지도 위 영웅 아이콘 크기"></span>
       <span class="cl" id="calHint">🖌 도구를 켜면 맵 위에 그리기·핀·토큰 배치 가능</span>
+    </div>
+    <!-- 경기 전체 이벤트 타임라인. 위=1팀, 아래=2팀. 누르면 그 시각으로 이동 -->
+    <div id="timeline">
+      <div class="tlrow t0"><span class="tag">1팀</span><div class="track" id="tl0"></div></div>
+      <div class="tlaxis" id="tlAxis"></div>
+      <div class="tlrow t1"><span class="tag">2팀</span><div class="track" id="tl1"></div></div>
+      <div class="tlnow" id="tlNow"></div>
+      <div class="tlkey">💀킬 · 🏰건물 · ⚔️용병 · 🪶오브젝트 &nbsp;|&nbsp; 눌러서 그 시각으로 이동</div>
     </div>
   </div>
   <aside id="side">
-    <h2><button id="sideTgl" title="로그 접기/펴기">▸</button><span class="lbl">이벤트 로그</span></h2>
+    <h2><button id="sideTgl" title="접기/펴기">▸</button><span class="lbl">경험치 · 이벤트</span></h2>
+    <div id="xpBox">
+      <div class="xphd"><span>시간별 경험치</span>
+        <button id="xpBig" title="그래프 크게 보기 (G)">⤢ 크게</button>
+        <select id="xpKind">
+          <option value="total">합계</option>
+          <option value="minion">돌격병</option>
+          <option value="creep">용병</option>
+          <option value="hero">영웅 처치</option>
+          <option value="struct">구조물</option>
+          <option value="trickle">시간 경과</option>
+        </select></div>
+      <canvas id="gXp"></canvas>
+      <div id="xpLegend"></div>
+    </div>
     <div id="filters">
       <button data-f="kill" class="on">킬</button>
       <button data-f="struct" class="on">건물</button>
@@ -110,22 +152,40 @@
     <div id="log"><div class="empty">리플레이를 열면 이벤트가 여기에 표시됩니다</div></div>
   </aside>
 </main>
-<script src="js/data_maps.js?v=16"></script>
-<script src="js/data_heroes.js?v=16"></script>
-<script src="js/data_talents.js?v=16"></script>
-<script src="js/data_samples.js?v=16"></script>
-<script src="js/data_pathing.js?v=16"></script>
-<script src="js/demo_replay.js?v=16"></script>
-<script src="js/py_bundle.js?v=16"></script>
-<script src="js/pathing.js?v=16"></script>
-<script src="js/engine.js?v=16"></script>
-<script src="js/render.js?v=16"></script>
-<script src="js/log.js?v=16"></script>
-<script src="js/teambar.js?v=16"></script>
-<script src="js/panzoom.js?v=16"></script>
-<script src="js/tools.js?v=16"></script>
-<script src="js/maps.js?v=16"></script>
-<script src="js/parser.js?v=16"></script>
-<script src="js/main.js?v=16"></script>
+
+<!-- 경험치 그래프 크게 보기 -->
+<div id="xpModal" hidden>
+  <div class="xmbox">
+    <div class="xmhd">
+      <b>시간별 경험치</b>
+      <select id="xpKind2"></select>
+      <label class="ck"><input type="checkbox" id="xpLvLines" checked> 레벨 문턱선</label>
+      <label class="ck"><input type="checkbox" id="xpPerTeam"> 팀별 항목 분해</label>
+      <button id="xpClose" title="닫기 (Esc)">✕</button>
+    </div>
+    <canvas id="gXpBig"></canvas>
+    <div id="xpLegend2"></div>
+    <div id="lvTable"></div>
+  </div>
+</div>
+<script src="js/data_maps.js?v=24"></script>
+  <script src="js/data_levels.js?v=24"></script>
+<script src="js/data_heroes.js?v=24"></script>
+<script src="js/data_talents.js?v=24"></script>
+<script src="js/data_samples.js?v=24"></script>
+<script src="js/data_pathing.js?v=24"></script>
+<script src="js/demo_replay.js?v=24"></script>
+<script src="js/py_bundle.js?v=24"></script>
+<script src="js/pathing.js?v=24"></script>
+<script src="js/engine.js?v=24"></script>
+<script src="js/render.js?v=24"></script>
+<script src="js/log.js?v=24"></script>
+<script src="js/teambar.js?v=24"></script>
+<script src="js/timeline.js?v=24"></script>
+<script src="js/panzoom.js?v=24"></script>
+<script src="js/tools.js?v=24"></script>
+<script src="js/maps.js?v=24"></script>
+<script src="js/parser.js?v=24"></script>
+<script src="js/main.js?v=24"></script>
 </body>
 </html>

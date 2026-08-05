@@ -38,6 +38,7 @@ def extract(path):
     tag_index_info = {}
     tracks = defaultdict(list)     # pid -> [sec, x, y, src]
     structures = []                # 게임 시작 시 구조물 좌표 (SVG 정렬용)
+    team_xp = []                   # 팀별 레벨·경험치 시계열 (그래프용)
 
     # 플레이어의 «본체» 영웅 유닛만 추적한다.
     # 이름이 Hero 로 시작한다고 다 본체가 아니다: D.Va 조종사(HeroDVaPilot),
@@ -96,6 +97,22 @@ def extract(path):
 
         elif et == "NNet.Replay.Tracker.SStatGameEvent":
             name = ds(ev["m_eventName"])
+            if name == "PeriodicXPBreakdown":
+                # 팀별 레벨·경험치 시계열. 그래프에 쓴다 (타임라인에는 안 넣는다).
+                ints = {ds(s["m_key"]): s["m_value"] for s in (ev.get("m_intData") or [])}
+                fixed = {ds(s["m_key"]): s["m_value"] / 4096.0
+                         for s in (ev.get("m_fixedData") or [])}
+                team = 0 if ints.get("Team", 1) == 1 else 1
+                team_xp.append({
+                    "t": int(fixed.get("GameTime", sec)), "team": team,
+                    "lv": ints.get("TeamLevel", 0),
+                    "minion": round(fixed.get("MinionXP", 0)),
+                    "hero": round(fixed.get("HeroXP", 0)),
+                    "struct": round(fixed.get("StructureXP", 0)),
+                    "creep": round(fixed.get("CreepXP", 0)),
+                    "trickle": round(fixed.get("TrickleXP", 0)),
+                })
+                continue
             if name in SKIP_STAT:
                 continue
             rec = {"t": sec, "e": name}
@@ -121,6 +138,7 @@ def extract(path):
     # 이동/공격 명령: 플레이어당 초당 1개로 다운샘플.
     # m_abil 이 있는 것은 «스킬을 그 지점에 쓴 것»이라 이동 목적지가 아니다.
     # (갈처럼 이동 명령이 아예 없는 영웅은 스킬 조준점이 전부 이동으로 오인됐다)
+    apm = defaultdict(lambda: defaultdict(int))   # userId -> 분 -> 명령 수 (APM 용)
     commands = defaultdict(list)    # userId -> [sec, x, y]   순수 이동 명령
     aims = defaultdict(list)        # userId -> [sec, x, y]   스킬 조준점
     last_sec, last_aim = {}, {}
@@ -128,16 +146,21 @@ def extract(path):
     for ev in game_events:
         if ev["_event"] != "NNet.Game.SCmdEvent":
             continue
+        uid = ev["_userid"]["m_userId"]
+        sec = ev["_gameloop"] // 16
+        apm[uid][sec // 60] += 1        # 좌표 유무와 무관하게 «행동»으로 센다
         data = ev.get("m_data") or {}
         target = data.get("TargetPoint") or ((data.get("TargetUnit") or {}).get("m_snapshotPoint"))
         if not target:
             continue
-        uid = ev["_userid"]["m_userId"]
-        sec = ev["_gameloop"] // 16
         pt = [sec, round(target["x"] / 4096.0, 1), round(target["y"] / 4096.0, 1)]
-        if ev.get("m_abil") is not None:
+        abil = ev.get("m_abil")
+        if abil is not None:
             # 스킬을 그 지점에 썼다 = «그때 사거리 안에 있었다»는 약한 단서다.
             # 이동 목적지로 쓰면 안 된다 (갈처럼 이동 명령이 없는 영웅이 끌려간다).
+            # 스킬 번호(abilLink)도 같이 담는다. 같은 영웅 안에서는 번호가 스킬을
+            # 구분하므로 «몇 번 스킬을 언제 썼나»를 화면에 보여줄 수 있다.
+            pt = pt + [abil.get("m_abilLink")]
             if last_aim.get(uid) == sec:
                 aims[uid][-1] = pt
             else:
@@ -162,6 +185,10 @@ def extract(path):
         # 묶어서 동명이인이 있으면 한 명의 이동명령이 통째로 사라졌다.
         "movement_commands": {pname(uid + 1): pts for uid, pts in commands.items()},
         "ability_aims": {pname(uid + 1): pts for uid, pts in aims.items()},
+        "team_xp": sorted(team_xp, key=lambda r: (r["t"], r["team"])),
+        # 분 단위 명령 수 (APM). {"이름(영웅)": {"0": 42, "1": 55, ...}}
+        "apm": {pname(uid + 1): {str(m): n for m, n in sorted(b.items())}
+                for uid, b in apm.items()},
         "timeline": timeline,
     }
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))

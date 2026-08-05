@@ -32,7 +32,8 @@ function vmid(){const a=[...vpts.values()];
   return {x:(a[0].x+a[1].x)/2, y:(a[0].y+a[1].y)/2,
           d:Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y)};}
 stage.addEventListener('pointerdown',function(e){
-  if(e.target.closest('#zbar')||e.target.closest('#tgl')||e.target.closest('#tbar')||e.target.closest('#trash'))return;
+  if(e.target.closest('#zbar')||e.target.closest('#tgl')||e.target.closest('#tbar')||
+     e.target.closest('#trash')||e.target.closest('#quickmenu'))return;
   vpts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   stage.setPointerCapture(e.pointerId);
   if(vpts.size===2){ const m=vmid(); const r=stage.getBoundingClientRect();

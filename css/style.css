@@ -20,37 +20,138 @@ body{background:var(--bg);color:var(--ink);font-family:'Pretendard','Malgun Goth
 #modebar .map-name{color:var(--gold);font-size:12px;margin-left:auto;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ---- 상단 팀 바: 좌우 5명씩 초상화 + 특성 픽 ---- */
-#teambar{flex:none;display:none;align-items:stretch;gap:10px;padding:6px 12px;
-  background:var(--panel);border-bottom:1px solid var(--line)}
-body.mode-replay.has-replay #teambar{display:flex}
-#teambar .side{flex:1;display:flex;gap:6px;min-width:0}
-#teambar .side.t1{flex-direction:row-reverse}
-#teambar .vs{align-self:center;color:var(--dim);font-size:10px;letter-spacing:.1em;flex:none}
-.pl{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;flex:1;max-width:104px}
-.pl .por{position:relative;width:34px;height:34px;border-radius:50%;overflow:hidden;
+/* ---- 게임식 상단 스코어보드 ---- */
+#topbar{flex:none;display:none;align-items:stretch;gap:10px;padding:6px 10px;
+  background:linear-gradient(#1a2130,#141a26);border-bottom:1px solid var(--line)}
+body.mode-replay.has-replay #topbar{display:flex}
+#topbar .tside{flex:1;display:flex;gap:6px;min-width:0}
+#topbar .tside.t1{flex-direction:row-reverse}
+#topbar .tcenter{flex:none;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;padding:0 12px;min-width:236px}
+/* 팀 레벨·킬·건물은 «시계를 가운데 두고» 좌우로 갈라 놓는다 */
+#topbar .score{display:flex;align-items:center;gap:14px}
+#topbar .sc{display:flex;flex-direction:column;gap:1px;min-width:72px;align-items:flex-end}
+#topbar .sc.r{align-items:flex-start}
+#topbar .lv{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1}
+#topbar .sc.b .lv{color:var(--blue)} #topbar .sc.r .lv{color:var(--red)}
+#topbar .clockbig{font-family:var(--mono);font-size:20px;letter-spacing:.04em;
+  background:#0d1118;border:1px solid var(--line);border-radius:5px;padding:2px 10px}
+#topbar .kb{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--dim);white-space:nowrap}
+#topbar .sc.r .kb{flex-direction:row-reverse}
+#topbar .kb b{font-family:var(--mono);font-size:14px}
+#topbar .sc.b .kb b{color:var(--blue)} #topbar .sc.r .kb b{color:var(--red)}
+#topbar .kb i{font-style:normal;opacity:.7}
+/* 통계 페이지 전환 (참고: SpazzoReplayStatKit 의 Control+1~6 방식) */
+.pagetabs{display:flex;gap:3px}
+.pagetabs button{font-size:10px;padding:2px 8px;border-radius:4px;color:var(--dim);
+  font-family:inherit;line-height:1.5}
+.pagetabs button.on{color:var(--gold);border-color:var(--gold);background:#2a2416}
+/* 선수 통계 줄 — 페이지에 따라 특성/KDA/APM/XP 가 들어간다 */
+.pl .stat{display:flex;gap:6px;font-size:10px;color:var(--dim);font-family:var(--mono);
+  white-space:nowrap;overflow:hidden}
+.tside.t1 .pl .stat{flex-direction:row-reverse}
+.pl .stat s{text-decoration:none;color:var(--ink)}
+.pl .stat s.k{color:#5ad19a} .pl .stat s.d{color:var(--red)}
+
+/* 선수 한 명 = 초상화 + 특성 줄 + 스킬 사용 표시 */
+.pl{flex:1;min-width:0;max-width:168px;display:flex;gap:5px;align-items:center;
+  background:#141a25;border:1px solid var(--line);border-radius:6px;padding:4px 5px}
+.tside.t1 .pl{flex-direction:row-reverse}
+.pl.b{border-left:3px solid var(--blue)} .pl.r{border-right:3px solid var(--red)}
+.pl .por{position:relative;width:42px;height:42px;flex:none;border-radius:6px;overflow:hidden;
   border:2px solid var(--line);background:var(--panel2)}
 .pl.b .por{border-color:var(--blue)} .pl.r .por{border-color:var(--red)}
 .pl .por img{width:100%;height:100%;object-fit:cover;display:block}
-.pl.dead .por img{filter:grayscale(1) brightness(.6)}
-.pl .por .lv{position:absolute;right:-1px;bottom:-1px;background:rgba(10,14,22,.9);
-  color:var(--gold);font-family:var(--mono);font-size:9px;line-height:1;padding:1px 2px;border-radius:3px}
-.pl .nm{font-size:9px;color:var(--dim);max-width:100%;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-/* 특성: 티어 7칸. 찍은 것만 아이콘이 뜨고, 안 찍은 칸은 빈 자리로 남는다 */
+.pl.dead .por img{filter:grayscale(1) brightness(.55)}
+.pl.dead .por::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:#e6ecf5;font-size:19px;text-shadow:0 1px 3px #000}
+/* 스킬을 방금 쓰면 초상화 테두리가 번쩍인다 */
+.pl.cast .por{box-shadow:0 0 0 2px var(--gold),0 0 9px rgba(232,182,76,.8)}
+.pl .col{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.pl .nm{font-size:10px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tside.t1 .pl .nm{text-align:right}
+/* 특성: 티어 7칸. 찍은 것만 아이콘이 뜬다 */
 .pl .tal{display:flex;gap:2px}
+.tside.t1 .pl .tal{flex-direction:row-reverse}
 .pl .tal i{width:20px;height:20px;border-radius:4px;background:#11151d;
-  border:1px solid var(--line);cursor:default;overflow:hidden;flex:none;
-  display:block;opacity:.28;position:relative}
+  border:1px solid var(--line);overflow:hidden;flex:none;display:block;opacity:.28}
 .pl .tal i img{width:100%;height:100%;display:block}
 .pl .tal i.got{opacity:1;border-color:#4a5670}
 .pl .tal i.got.noic{background:var(--gold);opacity:.9}
-.pl .tal i.fresh{border-color:var(--gold);box-shadow:0 0 0 2px rgba(232,182,76,.5)}
-@media (max-width:640px){
-  #teambar{padding:4px 6px;gap:4px}
+.pl .tal i.fresh{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+/* 스킬 사용 칸 */
+.pl .sk{display:flex;gap:2px}
+.tside.t1 .pl .sk{flex-direction:row-reverse}
+.pl .sk u{width:12px;height:5px;border-radius:1px;background:#232c3d;display:block;text-decoration:none}
+.pl .sk u.hot{background:var(--gold)}
+
+/* ---- 경험치 그래프 크게 보기 ---- */
+#xpModal{position:fixed;inset:0;z-index:70;background:rgba(6,9,14,.82);
+  display:flex;align-items:center;justify-content:center;padding:24px}
+#xpModal[hidden]{display:none}
+#xpModal .xmbox{width:min(1180px,96vw);height:min(760px,92vh);display:flex;flex-direction:column;
+  gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+#xpModal .xmhd{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink)}
+#xpModal .xmhd select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+  border-radius:4px;font:inherit;font-size:12px;padding:3px 6px;cursor:pointer}
+#xpModal .ck{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);cursor:pointer}
+#xpModal #xpClose{margin-left:auto;font-size:14px;padding:2px 10px;border-radius:4px;color:var(--dim)}
+#gXpBig{flex:1;min-height:0;width:100%;background:#11151d;border:1px solid var(--line);border-radius:6px;cursor:crosshair}
+#xpLegend2{display:flex;gap:12px;font-size:11px;color:var(--dim);flex-wrap:wrap}
+#xpLegend2 b{font-family:var(--mono);color:var(--ink)}
+#lvTable{flex:none;max-height:96px;overflow:auto;display:flex;flex-wrap:wrap;gap:3px 8px;
+  font-size:10px;color:var(--dim);font-family:var(--mono);border-top:1px solid var(--line);padding-top:6px}
+#lvTable span{white-space:nowrap}
+#lvTable span.on{color:var(--gold)}
+#lvTable .note{width:100%;font-family:inherit;opacity:.7}
+.xphd #xpBig{font-size:10px;padding:2px 7px;border-radius:4px;color:var(--dim);margin-left:auto}
+.xphd #xpBig:hover{color:var(--gold);border-color:var(--gold)}
+
+/* ---- 우측: 경험치 그래프 + 이벤트 로그 ---- */
+#xpBox{flex:none;display:flex;flex-direction:column;gap:3px;padding:0 10px 8px}
+.xphd{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  font-size:10px;color:var(--dim);letter-spacing:.06em}
+.xphd select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+  border-radius:4px;font:inherit;font-size:10px;padding:2px 4px;cursor:pointer}
+#gXp{width:100%;height:118px;background:#11151d;border:1px solid var(--line);border-radius:5px}
+#xpLegend{display:flex;gap:10px;font-size:10px;color:var(--dim);flex-wrap:wrap}
+#xpLegend b{font-family:var(--mono)}
+#side.collapsed #xpBox{display:none}
+
+/* ---- 경기 전체 이벤트 타임라인 (하단) ---- */
+#timeline{flex:none;display:none;flex-direction:column;gap:1px;
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:4px 8px 2px;position:relative;user-select:none}
+body.mode-replay.has-replay #timeline{display:flex}
+.tlrow{display:flex;align-items:center;gap:6px;height:18px}
+.tlrow .tag{flex:none;width:26px;font-size:9px;letter-spacing:.05em}
+.tlrow.t0 .tag{color:var(--blue)} .tlrow.t1 .tag{color:var(--red)}
+.tlrow .track{position:relative;flex:1;height:100%;background:#11151d;
+  border:1px solid var(--line);border-radius:3px;cursor:pointer;overflow:hidden}
+.tlrow.t0 .track{border-bottom-color:#2b3d5e}
+.tlrow.t1 .track{border-top-color:#4a2b33}
+.tlmark{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:11px;
+  line-height:1;cursor:pointer;text-shadow:0 1px 2px #000;pointer-events:auto}
+.tlmark:hover{transform:translate(-50%,-50%) scale(1.45);z-index:3}
+.tlaxis{position:relative;height:12px;margin-left:32px;cursor:pointer}
+.tlaxis span{position:absolute;top:0;transform:translateX(-50%);
+  font-family:var(--mono);font-size:9px;color:var(--dim)}
+.tlaxis span::before{content:'';position:absolute;left:50%;top:-2px;width:1px;height:4px;background:var(--line)}
+.tlnow{position:absolute;top:4px;bottom:4px;width:2px;background:var(--gold);
+  pointer-events:none;box-shadow:0 0 6px rgba(232,182,76,.7);margin-left:0}
+.tlkey{display:none}
+
+@media (max-width:860px){
   .pl{max-width:none} .pl .nm{display:none}
-  .pl .por{width:26px;height:26px}
-  .pl .tal{gap:1px} .pl .tal i{width:13px;height:13px;border-radius:3px}
+}
+@media (max-width:640px){
+  #topbar{gap:4px;padding:4px 5px}
+  #topbar .tcenter{min-width:150px;padding:0 4px}
+  #topbar .clockbig{font-size:15px;padding:1px 6px}
+  #topbar .lv{font-size:20px} #topbar .sc{min-width:48px} #topbar .score{gap:8px}
+  #topbar .kb{font-size:9px} #topbar .kb b{font-size:11px}
+  .pl .col{display:none}
+  .pl{max-width:56px;justify-content:center}
 }
 
 header{flex:none;display:flex;align-items:center;gap:14px;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -134,6 +235,7 @@ main{flex:1;display:flex;min-height:0}
 #quickmenu button{display:flex;align-items:center;gap:8px;background:none;border:1px solid transparent;
   color:var(--ink);font-family:inherit;font-size:12px;padding:5px 9px;border-radius:5px;text-align:left}
 #quickmenu button:hover{background:var(--panel2);border-color:var(--line)}
+#quickmenu button.warn{color:#ff9aa2}
 #quickmenu button.on{border-color:var(--gold);color:var(--gold)}
 #quickmenu b{font-family:var(--mono);font-size:10px;color:var(--dim);width:10px}
 #quickmenu .ic{font-size:15px;width:20px;text-align:center}
@@ -164,6 +266,8 @@ body.objmove .obj{cursor:grab;pointer-events:auto}
   border-top:9px solid #fff}
 .imgobj{pointer-events:auto}
 .imgobj.sel{outline:3px solid var(--gold)}
+.pinw.sel .pinb,.pinw.sel .ph-c{box-shadow:0 0 0 3px var(--gold)}
+.mark.sel{box-shadow:0 0 0 3px var(--gold)}
 /* ---- 컨트롤 ---- */
 #controls{display:flex;align-items:center;gap:10px}
 button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:4px;
@@ -211,7 +315,8 @@ body.mode-map #sampleSel,
 body.mode-map #repLoadLabel,
 body.mode-map #repToggles{display:none}
 body:not(.has-replay) #snapBoard{display:none}
-body.mode-replay #bgLabel{display:none}
+body.mode-replay #bgLabel,
+body.mode-replay #calGroup{display:none}
 #closeRep{display:none}
 body.mode-replay.has-replay #closeRep{display:inline-block}
 /* 리플레이 보기인데 아직 연 리플레이가 없을 때 안내 */
@@ -253,3 +358,13 @@ body.mode-replay:not(.has-replay) #needRep{display:block}
   #controls{gap:6px} #clock{min-width:72px;font-size:15px}
   #play{width:56px;padding:6px 6px} .spd{padding:6px 5px;font-size:11px}
 }
+
+/* 배치보드 표식 — 파괴된 구조물 */
+.obj.mark{display:flex;align-items:center;justify-content:center;color:#ff5f6d;
+  font-weight:900;line-height:1;text-shadow:0 1px 3px #000,0 0 2px #000;
+  background:rgba(14,17,22,.55);border:2px solid rgba(255,95,109,.75);border-radius:50%;
+  cursor:move;user-select:none}
+.obj.mark.core{color:#ffd479;border-color:rgba(255,212,121,.8)}
+/* 사망 상태로 옮겨진 말 */
+.obj.tok.dead img{filter:grayscale(1) brightness(.7)}
+.obj.tok.dead{opacity:.75;border-style:dashed!important}

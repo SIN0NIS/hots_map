@@ -12,7 +12,7 @@ let tCur = 0, playing = false, speed = 4, lastTs = 0;
 let bgImg = null, bgAlpha = 0.7, showStruct = true, showHeroIcons = true;
 let cal = null;
 const R = 2;                     // 월드 좌표계 기준 배율 (예전 캔버스 배율을 그대로 씀)
-const HERO_R = 27;               // 영웅 아이콘 반지름 (화면 CSS px). 18 -> 27 = 1.5배
+let HERO_R = 27;                 // 영웅 아이콘 반지름 (화면 CSS px). 하단 슬라이더로 조절
 
 const stage=document.getElementById('stage'), world=document.getElementById('world');
 const bgEl=document.getElementById('bgimg');

@@ -146,6 +146,8 @@ function resizeObj(o,s){
     o.el.style.borderWidth=Math.max(2,Math.round(s*.05))+'px';
   }
   if(o.type==='img') o.el.style.width=s+'px';
+  if(o.type==='mark'){ o.el.style.width=o.el.style.height=s+'px';
+    o.el.style.fontSize=Math.round(s*.72)+'px'; }
 }
 function setSlider(){
   if(mode==='tok'){ szEl.min=16; szEl.max=400; szEl.value=selObj?selObj.s:tokSz; }
@@ -162,7 +164,7 @@ szEl.oninput=()=>{
 
 /* --- 모드 전환 --- */
 const HINTS={
- pan:'Q=도구 빠른 선택 · V✋ B✏️ E🧽 P📍 T♟ · 말/핀은 끌어서 이동, 🗑에 놓으면 삭제',
+ pan:'우클릭=도구 빠른 선택 · V✋ B✏️ E🧽 P📍 T♟ · 말/핀은 끌어서 이동, 🗑에 놓으면 삭제',
  pen:'끌어서 그리기 · 말은 ✋에서 이동',
  ers:'문질러서 지우기',
  pin:'탭=핀 추가 · 영웅을 고르면 영웅 핀, ●이면 색 핀',
@@ -223,7 +225,7 @@ function selectObj(o){
   selObj=o;
   if(o){
     o.el.classList.add('sel');
-    if(mode==='tok'&&o.s){ szEl.value=o.s; szv.textContent=o.s; }
+    if(mode==='tok'&&o.type==='tok'&&o.s){ szEl.value=o.s; szv.textContent=o.s; }
   }
 }
 
@@ -283,6 +285,19 @@ function addPin(x,y){
   ST.hist.push({t:'add',o});
   return o;
 }
+/* 표식 — 파괴된 구조물처럼 «자리»만 알려 주는 객체.
+   토큰과 달리 팀·번호가 없고, 옮기고 지우는 것은 똑같이 된다. */
+function addMark(x,y,txt,cls,s){
+  const el=document.createElement('div');
+  el.className='obj mark '+(cls||'');
+  el.textContent=txt||'✕';
+  const o={type:'mark',x,y,s:s||34,el};
+  el.style.width=el.style.height=o.s+'px';
+  el.style.fontSize=Math.round(o.s*.72)+'px';
+  place(o); objsEl.appendChild(el); ST.objs.push(o);
+  ST.hist.push({t:'add',o});
+  return o;
+}
 function addImg(src,x,y,wpx){
   const el=document.createElement('img');
   el.className='obj imgobj'; el.src=src; el.draggable=false;
@@ -336,7 +351,7 @@ function tmid(){
   return {x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2,d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};
 }
 function startObjDrag(o,p,e){
-  if(o.type!=='pin') selectObj(o);
+  selectObj(o);
   act={kind:'obj',id:e.pointerId,o,dx:o.x-p.x,dy:o.y-p.y};
   trash.classList.add('show');
 }
@@ -347,6 +362,7 @@ document.addEventListener('pointerdown',function(e){
   if(e.target.closest('#quickmenu')) return;   // 빠른메뉴는 «도구 대상»이 아니다
   if(qmOpen) closeQuick();                     // 메뉴 밖을 누르면 닫는다
   const p=mapPt(e), o=hit(p);
+  if(!o) selectObj(null);        // 맨땅을 누르면 어떤 도구에서든 선택을 푼다
   if(mode==='pan'){
     if(!o) return;
     e.stopPropagation(); e.preventDefault();
@@ -432,20 +448,22 @@ document.addEventListener('pointerup',endTool,true);
 document.addEventListener('pointercancel',endTool,true);
 
 /* --- 빠른 도구 바꾸기 ---
-   Q 를 누르면 마우스 자리에 작은 메뉴가 뜬다. 숫자키·클릭으로 고르고 Esc 로 닫는다.
-   도구 패널을 열지 않아도 바로 쓸 수 있다. */
+   지도 위에서 «우클릭» 하면 그 자리에 메뉴가 뜬다. 좌클릭이나 1~5 키로 고르고
+   Esc·우클릭으로 닫는다. 도구 패널을 열지 않아도 바로 쓸 수 있다. */
 const QUICK=[
   {m:'pan', ic:'✋', ko:'이동/선택'},
   {m:'pen', ic:'✏️', ko:'펜'},
   {m:'ers', ic:'🧽', ko:'지우개'},
   {m:'pin', ic:'📍', ko:'핀'},
   {m:'tok', ic:'♟', ko:'토큰'},
+  {m:'clr', ic:'🗑', ko:'모두 지우기', warn:true},
 ];
 const qm=document.createElement('div');
 qm.id='quickmenu';
 QUICK.forEach((q,i)=>{
   const b=document.createElement('button');
   b.innerHTML=`<b>${i+1}</b><span class="ic">${q.ic}</span><span>${q.ko}</span>`;
+  if(q.warn) b.className='warn';
   b.onclick=()=>{ pickQuick(q.m); };
   qm.appendChild(b);
 });
@@ -454,19 +472,26 @@ let qmOpen=false, lastMouse={x:0,y:0};
 stage.addEventListener('pointermove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; });
 function pickQuick(m){
   closeQuick();
+  if(m==='clr'){ document.getElementById('clrAll').click(); return; }  // Ctrl+Z 로 되돌릴 수 있다
   if(m==='pan'){ setToolOn(false); return; }
   setToolOn(true); setMode(m);
 }
 function openQuick(){
   const r=stage.getBoundingClientRect();
   const x=Math.min(Math.max(8,lastMouse.x-r.left-60), r.width-150);
-  const y=Math.min(Math.max(8,lastMouse.y-r.top-60), r.height-190);
+  const y=Math.min(Math.max(8,lastMouse.y-r.top-60), r.height-226);
   qm.style.left=x+'px'; qm.style.top=y+'px';
   qm.classList.add('on'); qmOpen=true;
   [...qm.children].forEach((b,i)=>b.classList.toggle('on', QUICK[i].m===(toolOn?mode:'pan')));
 }
 function closeQuick(){ qm.classList.remove('on'); qmOpen=false; }
 stage.addEventListener('pointerdown',e=>{ if(qmOpen && !e.target.closest('#quickmenu')) closeQuick(); },true);
+stage.addEventListener('contextmenu',e=>{
+  if(e.target.closest('#tbar')||e.target.closest('#zbar')||e.target.closest('#tgl')) return;
+  e.preventDefault();
+  lastMouse={x:e.clientX,y:e.clientY};
+  qmOpen ? closeQuick() : openQuick();
+});
 
 window.addEventListener('keydown',e=>{
   if(isTypingTarget()) return;
@@ -476,9 +501,8 @@ window.addEventListener('keydown',e=>{
     const n=parseInt(e.key,10);
     if(n>=1&&n<=QUICK.length){ e.preventDefault(); pickQuick(QUICK[n-1].m); return; }
     // stopImmediatePropagation 이 없으면 main.js 의 Esc(도구 해제)가 이어서 돌아간다
-    if(k==='escape'||k==='q'){ e.preventDefault(); e.stopImmediatePropagation(); closeQuick(); return; }
+    if(k==='escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeQuick(); return; }
   }
-  if(k==='q'){ e.preventDefault(); qmOpen?closeQuick():openQuick(); return; }
   // 한 글자 단축키 — 패널을 열지 않아도 바로 그 도구가 된다
   const HOT={v:'pan', b:'pen', e:'ers', p:'pin', t:'tok'};
   if(HOT[k]!==undefined){ e.preventDefault(); pickQuick(HOT[k]); }

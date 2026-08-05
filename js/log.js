@@ -69,5 +69,5 @@ sideTgl.onclick=()=>{
   const c=sideEl.classList.toggle('collapsed');
   sideTgl.textContent=c?'◂':'▸';
   sideTgl.title=c?'로그 펴기':'로그 접기';
-  requestAnimationFrame(()=>{ resizeOverlay(); fit(); });
+  requestAnimationFrame(()=>{ resizeOverlay(); fit(); if(typeof drawXp==='function') drawXp(); });
 };

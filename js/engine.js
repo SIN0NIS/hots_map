@@ -25,7 +25,7 @@ function prepare(raw){
   for(const nm in (raw.ability_aims||{})){
     const lab = heroes[nm] ? nm : (label[nm] || nm);
     if(!heroes[lab]) continue;
-    for(const p of raw.ability_aims[nm]) heroes[lab].pts.push({t:p[0],x:p[1],y:p[2],src:'a'});
+    for(const p of raw.ability_aims[nm]) heroes[lab].pts.push({t:p[0],x:p[1],y:p[2],src:'a',link:p[3]});
   }
   let maxT = 0, minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
   for(const lab in heroes){
@@ -43,7 +43,12 @@ function prepare(raw){
       if(d<bd && s.deathT===Infinity){bd=d;best=s;} }
     if(best) best.deathT=e.t;
   }
-  const out = { players, heroes, evs, maxT, structures,
+  // 선수별 총 경험치 (경기 종료 시점 기록)
+  const xpEnd={};
+  for(const e of (raw.timeline||[])) if(e.e==='EndOfGameXPBreakdown' && e.player)
+    xpEnd[e.player]=(e.MinionXP||0)+(e.CreepXP||0)+(e.StructureXP||0)+(e.HeroXP||0)+(e.TrickleXP||0);
+  const out = { players, heroes, evs, maxT, structures, teamXp: raw.team_xp||[],
+    apm: raw.apm||{}, xpEnd,
     bounds:{minX:minX-6,maxX:maxX+6,minY:minY-6,maxY:maxY+6} };
   for(const lab in heroes){
     const h = heroes[lab];
@@ -203,9 +208,11 @@ function evHTML(e, players){
     case 'kill':{ ic='💀';
       body=`${nameHTML(e.player,players)} 처치됨 <span class="dim">←</span> `+
         (e.killers||[]).map(k=>nameHTML(k,players)).join(', '); break; }
-    case 'struct':{ ic='🏰';
-      const u=(e.UnitType||e.unit||'건물').replace(/^Town/,'');
-      body=`<b class="g">${u}</b> 파괴` + (e.killers?` <span class="dim">←</span> `+e.killers.map(k=>nameHTML(k,players)).join(', '):''); break; }
+    case 'struct':{
+      const k=(typeof structKind==='function')?structKind(e.UnitType||e.unit)
+              :{ko:(e.UnitType||e.unit||'건물').replace(/^Town/,''), ic:'🏰'};
+      ic=k.ic;
+      body=`<b class="g">${k.ko}</b> 파괴` + (e.killers?` <span class="dim">←</span> `+e.killers.map(k=>nameHTML(k,players)).join(', '):''); break; }
     case 'merc':{ ic='⚔️'; body=`${span((e.CampType||'용병'), tm(e.TeamID))} 점령 <span class="dim">(캠프 ${e.CampID??'?'} · ${tm(e.TeamID)===0?'1팀':'2팀'})</span>`; break; }
     case 'obj':{ ic='🪶'; body=`<b class="g">${e.e}</b>` + (e.TeamID?` <span class="dim">${tm(e.TeamID)===0?'1팀':'2팀'}</span>`:''); break; }
     case 'grow':{ ic='⬆';
