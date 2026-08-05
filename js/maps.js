@@ -14,7 +14,7 @@ const mapSel=document.getElementById('mapSel');
   for(const m of MAP_DB) (m.brawl?g2:g1).appendChild(opt(m.slug,m.ko));
   mapSel.appendChild(g1); mapSel.appendChild(g2);
 })();
-mapSel.onchange=()=>{ if(mapSel.value) loadMapBySlug(mapSel.value); };
+mapSel.onchange=()=>{ if(mapSel.value){ loadMapBySlug(mapSel.value); syncHiResBtn(); } };
 
 /* 리플레이의 맵 이름(한/영, 샌드박스 표기 포함) -> MAP_DB 항목 */
 function mapNorm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9가-힣]/g,''); }
@@ -37,29 +37,54 @@ function mapViewBounds(m){
            minY: Math.max(0, m.cal.B), maxY: Math.min(m.H, m.cal.T) };
 }
 
-function loadMapBySlug(slug){
+/* 평소에는 가벼운 판(maps_lite, 약 0.5MB)을 쓰고, 「고화질」을 켰을 때만
+   원본(maps, 약 10MB)을 받는다. 둘은 골격이 같아 정렬값을 그대로 공유한다. */
+let hiRes=false;
+function mapFile(m){ return (!hiRes && m.lite) ? m.lite : m.file; }
+
+function loadMapBySlug(slug, keepView){
   const m=MAP_DB.find(x=>x.slug===slug);
   if(!m) return;
   curMapSlug=slug; mapSel.value=slug;
-  showLoading('맵 불러오는 중… '+m.ko);
+  const src=mapFile(m);
+  const mb=(!hiRes && m.lite) ? m.liteMb : m.mb;
+  showLoading(`맵 불러오는 중… ${m.ko}${mb?` (${mb}MB)`:''}`);
   const img=new Image();
   img.onload=()=>{
-    if(curMapSlug!==slug) return;          // 그 사이 다른 맵을 골랐다
-    bgImg=img; bgEl.src=img.src;           // 원본 SVG 를 그대로 화면에 얹는다
+    if(curMapSlug!==slug || bgEl.dataset.want!==src) return;  // 그 사이 다른 것을 골랐다
+    bgImg=img; bgEl.src=img.src;           // SVG 를 그대로 화면에 얹는다
     bgAutoCal={L:m.cal.L,R:m.cal.R,B:m.cal.B,T:m.cal.T};
     cal={...bgAutoCal};
     // 그림틀은 리플레이가 아니라 맵을 따른다 — 나중에 리플레이를 열어도
     // 화면이 안 흔들리고, 먼저 그려둔 판서·핀이 제자리에 남는다.
     setViewBounds(mapViewBounds(m));
-    syncCalInputs(); setupCanvas(); fit(); placeBg();
+    syncCalInputs(); setupCanvas(); placeBg();
+    if(!keepView) fit();                   // 고화질로 바꿔 끼울 때는 보던 자리를 지킨다
     hideLoading(); markDirty();
     setStatus(G && uiMode==='replay'
       ? '배경: '+m.ko+' — 구조물 마커와 어긋나면 배경 월드범위로 미세 조정'
       : m.ko+' — 끌어서 이동 · 휠로 확대 · 🖌 도구로 전술 작성');
   };
-  img.onerror=()=>{ hideLoading(); setStatus('맵 파일을 읽지 못했습니다: '+m.file); };
-  img.src=m.file;
+  img.onerror=()=>{ hideLoading(); setStatus('맵 파일을 읽지 못했습니다: '+src); };
+  bgEl.dataset.want=src;
+  img.src=src;
 }
+
+/* --- 고화질 토글 --- */
+const hiResBtn=document.getElementById('hires');
+function syncHiResBtn(){
+  const m=MAP_DB.find(x=>x.slug===curMapSlug);
+  hiResBtn.classList.toggle('on',hiRes);
+  hiResBtn.textContent=hiRes?'🔍 고화질':'🔍 고화질';
+  hiResBtn.title=hiRes
+    ? '원본 화질로 보는 중 — 누르면 가벼운 판으로 (빠름)'
+    : `원본 화질로 보기${m&&m.mb?` (${m.mb}MB 내려받음)`:''}`;
+}
+hiResBtn.onclick=()=>{
+  hiRes=!hiRes;
+  syncHiResBtn();
+  if(curMapSlug) loadMapBySlug(curMapSlug, true);   // 보던 자리를 유지한 채 갈아 끼운다
+};
 
 /* --- 직접 올린 배경 (SVG/PNG) --- */
 function applyBg(url, mapW, mapH, label){

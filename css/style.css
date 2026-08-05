@@ -52,6 +52,9 @@ main{flex:1;display:flex;min-height:0}
 #zbar button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:4px;
   font:inherit;padding:2px 8px;cursor:pointer}
 #zv{color:var(--dim);min-width:46px;text-align:center;font-family:var(--mono);font-size:11px}
+#zbar .zsep{width:1px;align-self:stretch;background:var(--line);margin:0 2px}
+#hires{color:var(--dim)}
+#hires.on{border-color:var(--gold);color:var(--gold);background:#2a2416}
 /* ---- 로딩 안내 ---- */
 #loading{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:7;display:none;
   background:rgba(22,28,40,.95);border:1px solid var(--gold);color:var(--gold);border-radius:6px;

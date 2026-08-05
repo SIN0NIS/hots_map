@@ -85,10 +85,18 @@ def build_maps():
         cal = CAL_OVERRIDE.get(slug) or {
             "L": round(W / 2 - half_w, 2), "R": round(W / 2 + half_w, 2),
             "B": round(H / 2 - half_h, 2), "T": round(H / 2 + half_h, 2)}
-        rows.append({
+        # 평소에는 가벼운 판을, 「고화질」을 켜면 원본을 쓴다.
+        # 둘은 골격·viewBox 가 같아 정렬값(cal)을 그대로 공유한다.
+        lite = os.path.join(ROOT, "maps_lite", f"{slug}.svg")
+        row = {
             "slug": slug, "ko": ko, "en": en, "brawl": brawl,
             "file": f"maps/{slug}.svg", "W": W, "H": H, "cal": cal,
-        })
+            "mb": round(os.path.getsize(path) / 1048576, 1),
+        }
+        if os.path.isfile(lite):
+            row["lite"] = f"maps_lite/{slug}.svg"
+            row["liteMb"] = round(os.path.getsize(lite) / 1048576, 2)
+        rows.append(row)
     body = ",\n".join("  " + json.dumps(r, ensure_ascii=False) for r in rows)
     out = ("// 자동 생성 — tools/build_data.py. 직접 고치지 말 것.\n"
            "// cal = 배경 그림이 덮는 게임 월드 범위 [L..R] x [B..T]\n"

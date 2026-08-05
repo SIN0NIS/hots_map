@@ -191,5 +191,5 @@ setTeamHint();
 setUIMode('map');
 const START_MAP='cursed_hollow';
 const startM=MAP_DB.find(m=>m.slug===START_MAP)||MAP_DB[0];
-if(startM) loadMapBySlug(startM.slug);
+if(startM){ loadMapBySlug(startM.slug); syncHiResBtn(); }
 requestAnimationFrame(tick);
