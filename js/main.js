@@ -128,6 +128,29 @@ closeRep.onclick=()=>{
   buildTeamBar();
   setUIMode('map');
 };
+/* 지금 재생 중인 영웅 배치를 전술 보드 말로 굳힌다.
+   보드 말은 맵 보기에서도 남으므로, 특정 순간의 구도를 놓고 작전을 그릴 수 있다. */
+document.getElementById('snapBoard').onclick=()=>{
+  if(!G) return;
+  const before=ST.objs.length;
+  const made=[];
+  for(const lab in G.heroes){
+    const hh=G.heroes[lab], p=posAt(hh,tCur);
+    if(!p||p.dead) continue;
+    const hd=heroByName(hh.heroName);
+    const [px,py]=proj(p.x,p.y);
+    const prevTeam=team, prevSel=heroSel;
+    team = hh.team===1?'red':'blue';
+    heroSel = hd ? {name:hh.heroName, src:'icons/'+hd.icon} : null;
+    made.push(addTok(px,py));
+    team=prevTeam; heroSel=prevSel;
+  }
+  // 한 번에 되돌릴 수 있게 방금 만든 것들을 한 묶음으로 바꿔 넣는다
+  ST.hist.length = ST.hist.length - made.length;
+  if(made.length) ST.hist.push({t:'addmany', objs:made});
+  setStatus(`현재 배치 ${made.length}명을 보드에 옮겼습니다 — 맵 보기에서도 남습니다 (Ctrl+Z 로 취소)`);
+};
+
 function setTeamHint(){
   document.getElementById('teamInfo').innerHTML=
     '<span class="dim">🖌 도구로 지도 위에 전술을 그릴 수 있습니다</span>';

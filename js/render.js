@@ -12,6 +12,7 @@ let tCur = 0, playing = false, speed = 4, lastTs = 0;
 let bgImg = null, bgAlpha = 0.7, showStruct = true, showHeroIcons = true;
 let cal = null;
 const R = 2;                     // 월드 좌표계 기준 배율 (예전 캔버스 배율을 그대로 씀)
+const HERO_R = 27;               // 영웅 아이콘 반지름 (화면 CSS px). 18 -> 27 = 1.5배
 
 const stage=document.getElementById('stage'), world=document.getElementById('world');
 const bgEl=document.getElementById('bgimg');
@@ -49,6 +50,18 @@ function resizeOverlay(){
   if(cv.width!==bw||cv.height!==bh){ cv.width=bw; cv.height=bh; }
   markDirty();
 }
+/* 패널이 열리고 닫히면 스테이지 크기가 바뀐다. 그때 오버레이 크기를 다시 잡지
+   않으면 캔버스가 늘어나 표기가 지도와 어긋난다.
+   ResizeObserver 로 관찰하되, 그리기 직전에 한 번 더 확인한다 — 관찰자는 창이
+   그려지지 않는 동안 콜백이 오지 않아 크기가 낡은 채로 남는 일이 있다. */
+if(typeof ResizeObserver!=='undefined'){
+  new ResizeObserver(()=>resizeOverlay()).observe(stage);
+}
+function ensureOverlaySize(){
+  const d=Math.min(2, window.devicePixelRatio||1);
+  if(cv.width!==Math.round(stage.clientWidth*d) ||
+     cv.height!==Math.round(stage.clientHeight*d)) resizeOverlay();
+}
 /* 배경 SVG 를 월드 좌표에 맞춰 CSS 로 앉힌다 (캔버스에 굽지 않는다) */
 function placeBg(){
   if(!bgImg||!cal){ bgEl.style.display='none'; return; }
@@ -66,6 +79,7 @@ function proj(x,y){ const B=VB;
 
 function draw(){
   needsDraw = false;
+  ensureOverlaySize();
   ctx.clearRect(0,0,cv.width,cv.height);
   // 리플레이 표기(구조물·이벤트·영웅)는 리플레이 보기에서만 얹는다
   const repView = !!G && (typeof uiMode==='undefined' || uiMode==='replay');
@@ -121,7 +135,7 @@ function draw(){
     for(let k=8;k>=1;k--){
       const p=posAt(hh,tCur-k*0.5); if(!p||p.dead) continue;
       const [px,py]=S(p.x,p.y);
-      ctx.beginPath(); ctx.arc(px,py,6*ss,0,7);
+      ctx.beginPath(); ctx.arc(px,py,9*ss,0,7);
       ctx.fillStyle=col+Math.round(18-k*2).toString(16).padStart(2,'0'); ctx.fill();
     }
     const p=posAt(hh,tCur); if(!p) continue;
@@ -131,24 +145,24 @@ function draw(){
     if(p.dead) ctx.globalAlpha=0.45;
     if(img){
       // 미니맵 아이콘: 팀색 테두리 원 안에 초상화
-      const r = 18*ss;
+      const r = HERO_R*ss;
       ctx.save();
       ctx.beginPath(); ctx.arc(px,py,r,0,7); ctx.clip();
       if(p.dead) ctx.filter='grayscale(1) brightness(.75)';
       ctx.drawImage(img, px-r, py-r, r*2, r*2);
       ctx.restore();
       ctx.beginPath(); ctx.arc(px,py,r,0,7);
-      ctx.lineWidth=4.4*ss; ctx.strokeStyle=p.dead?'#7d8aa5':col; ctx.stroke();
-      ctx.beginPath(); ctx.arc(px,py,r+2.2*ss,0,7);
-      ctx.lineWidth=2*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
+      ctx.lineWidth=6.6*ss; ctx.strokeStyle=p.dead?'#7d8aa5':col; ctx.stroke();
+      ctx.beginPath(); ctx.arc(px,py,r+3.3*ss,0,7);
+      ctx.lineWidth=3*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
     }else{
-      ctx.beginPath(); ctx.arc(px,py,12*ss,0,7);
+      ctx.beginPath(); ctx.arc(px,py,HERO_R*0.67*ss,0,7);
       ctx.fillStyle=p.dead?'#5a6577':col; ctx.fill();
-      ctx.lineWidth=4*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
+      ctx.lineWidth=6*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
     }
     if(p.dead){
       // 죽었다는 것이 한눈에 보이게 회색 테두리 위에 옅은 ✕ 를 겹친다
-      const r=(img?18:12)*ss;
+      const r=(img?HERO_R:HERO_R*0.67)*ss;
       ctx.strokeStyle='rgba(230,236,245,.75)'; ctx.lineWidth=2.4*ss;
       ctx.beginPath();
       ctx.moveTo(px-r*.55,py-r*.55); ctx.lineTo(px+r*.55,py+r*.55);

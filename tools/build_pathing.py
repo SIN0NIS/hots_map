@@ -27,7 +27,10 @@ ROOT = os.path.dirname(HERE)
 BASE = os.path.dirname(ROOT)
 P3D = os.path.join(BASE, "hots_minimap_view", "output", "3d")
 THR = 0.5              # g 채널 문턱 — 이 값을 넘으면 통행 불가
-MARGIN = 1             # 벽 쪽으로 한 칸 더 막는다 (영웅 반지름 대신)
+# 벽을 한 칸 부풀리면(MARGIN=1) 영웅이 실제로 서 있던 자리의 12.6% 가 «벽»이 되어
+# 멀쩡한 이동이 막히고, 그러다 15초 스냅샷에 끌려가며 벽을 건너뛴 것처럼 보였다.
+# 게임이 남긴 좌표를 기준으로 삼는 게 맞다 — 부풀리지 않는다.
+MARGIN = 0
 
 
 def walk_grid(slug, W, H):

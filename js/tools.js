@@ -10,17 +10,28 @@ let selObj=null, act=null, tpinch=null;
 const tp=new Map();
 
 /* --- 판서 --- */
-function strokePath(c,s){
-  c.globalCompositeOperation=(s.m==='ers')?'destination-out':'source-over';
-  c.strokeStyle=c.fillStyle=s.color; c.lineWidth=s.w;
+/* 밝은 지도 위에서도 선이 보이도록 검은 테두리를 먼저 깔고 그 위에 색을 얹는다 */
+const OUTLINE='#0b0e13';
+function strokeOne(c,s,color,w){
+  c.strokeStyle=c.fillStyle=color; c.lineWidth=w;
   if(s.pts.length<2){
-    c.beginPath(); c.arc(s.pts[0][0],s.pts[0][1],s.w/2,0,7); c.fill();
+    c.beginPath(); c.arc(s.pts[0][0],s.pts[0][1],w/2,0,7); c.fill();
   }else{
     c.beginPath(); c.moveTo(s.pts[0][0],s.pts[0][1]);
     for(let i=1;i<s.pts.length;i++) c.lineTo(s.pts[i][0],s.pts[i][1]);
     c.stroke();
   }
-  c.globalCompositeOperation='source-over';
+}
+function outlineW(w){ return w + Math.max(2, w*0.55); }
+function strokePath(c,s){
+  if(s.m==='ers'){
+    c.globalCompositeOperation='destination-out';
+    strokeOne(c,s,s.color,s.w);
+    c.globalCompositeOperation='source-over';
+    return;
+  }
+  strokeOne(c,s,OUTLINE,outlineW(s.w));   // 검은 테두리
+  strokeOne(c,s,s.color,s.w);             // 그 위에 색
 }
 function replayStrokes(){
   dctx.clearRect(0,0,dc.width,dc.height);
@@ -36,6 +47,7 @@ function undo(){
   const a=ST.hist.pop();
   if(a.t==='stroke'){ ST.strokes.pop(); replayStrokes(); }
   else if(a.t==='add'){ delObj(a.o,false); }
+  else if(a.t==='addmany'){ a.objs.forEach(o=>delObj(o,false)); }
   else if(a.t==='del'){ objsEl.appendChild(a.o.el); ST.objs.push(a.o); }
   else if(a.t==='clear'){
     ST.strokes=a.strokes; replayStrokes();
@@ -150,11 +162,22 @@ szEl.oninput=()=>{
 
 /* --- 모드 전환 --- */
 const HINTS={
- pan:'빈 곳 끌기=맵 이동 · 말/핀은 끌어서 이동, 🗑에 놓으면 삭제',
+ pan:'Q=도구 빠른 선택 · V✋ B✏️ E🧽 P📍 T♟ · 말/핀은 끌어서 이동, 🗑에 놓으면 삭제',
  pen:'끌어서 그리기 · 말은 ✋에서 이동',
  ers:'문질러서 지우기',
  pin:'탭=핀 추가 · 영웅을 고르면 영웅 핀, ●이면 색 핀',
  tok:'팀·영웅 고르고 탭=배치 · 끌기=맵 이동'};
+/* 지금 도구를 마우스 커서로 보여준다 (이모지를 SVG 로 감싸 커서로 쓴다) */
+const CURSOR_ICON={pen:'✏️',ers:'🧽',pin:'📍',tok:'♟'};
+function applyCursor(){
+  const ic = toolOn ? CURSOR_ICON[mode] : null;
+  if(!ic){ stage.style.cursor=''; return; }
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30">'+
+    '<text y="23" font-size="22">'+ic+'</text></svg>';
+  // 핀·펜은 «찍는 지점»이 왼쪽 아래, 나머지는 가운데를 기준점으로 둔다
+  const hot = (mode==='pen'||mode==='pin') ? '3 26' : '15 15';
+  stage.style.cursor=`url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hot}, crosshair`;
+}
 function setMode(m){
   mode=m;
   document.querySelectorAll('.it[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
@@ -166,15 +189,23 @@ function setMode(m){
   szwrap.style.display=(m==='pen'||m==='ers'||m==='tok')?'flex':'none';
   document.getElementById('hint').textContent=HINTS[m];
   document.body.classList.toggle('objmove',toolOn&&m!=='pen'&&m!=='ers');
-  setSlider();
+  setSlider(); applyCursor();
 }
 document.querySelectorAll('.it[data-m]').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
-tgl.onclick=()=>{
-  toolOn=!toolOn;
+
+/* 도구를 켜고 끈다. 도구 «패널»과는 따로다 — 패널을 닫아도 도구는 계속 쓸 수 있다. */
+function setToolOn(on){
+  toolOn=on;
   tgl.classList.toggle('on',toolOn);
-  tbar.classList.toggle('on',toolOn);
   document.body.classList.toggle('objmove',toolOn&&mode!=='pen'&&mode!=='ers');
-  if(!toolOn){ selectObj(null); act=null; tp.clear(); tpinch=null; trash.className=''; }
+  if(!toolOn){ selectObj(null); act=null; tp.clear(); tpinch=null; trash.className=''; setMode('pan'); }
+  applyCursor();
+}
+function setPanel(open){ tbar.classList.toggle('on',open); }
+tgl.onclick=()=>{
+  const open=!tbar.classList.contains('on');
+  setPanel(open);
+  if(open) setToolOn(true);
 };
 function selectObj(o){
   if(selObj) selObj.el.classList.remove('sel');
@@ -344,12 +375,17 @@ document.addEventListener('pointermove',function(e){
   e.stopPropagation(); e.preventDefault();
   if(act.kind==='draw'){
     const p=mapPt(e);
-    const last=act.s.pts[act.s.pts.length-1];
-    dctx.globalCompositeOperation=(act.s.m==='ers')?'destination-out':'source-over';
-    dctx.strokeStyle=act.s.color; dctx.lineWidth=act.s.w;
-    dctx.beginPath(); dctx.moveTo(last[0],last[1]); dctx.lineTo(p.x,p.y); dctx.stroke();
-    dctx.globalCompositeOperation='source-over';
     act.s.pts.push([p.x,p.y]);
+    // 테두리를 같이 그려야 하므로 획 전체를 다시 그린다 (획 하나라 부담 없다)
+    if(act.s.m==='ers'){
+      const last=act.s.pts[act.s.pts.length-2];
+      dctx.globalCompositeOperation='destination-out';
+      dctx.strokeStyle=act.s.color; dctx.lineWidth=act.s.w;
+      dctx.beginPath(); dctx.moveTo(last[0],last[1]); dctx.lineTo(p.x,p.y); dctx.stroke();
+      dctx.globalCompositeOperation='source-over';
+    }else{
+      replayStrokes(); strokePath(dctx,act.s);
+    }
   }else if(act.kind==='obj'){
     const p=mapPt(e);
     act.o.x=p.x+act.dx; act.o.y=p.y+act.dy; place(act.o);
@@ -381,4 +417,57 @@ function endTool(e){
 }
 document.addEventListener('pointerup',endTool,true);
 document.addEventListener('pointercancel',endTool,true);
+
+/* --- 빠른 도구 바꾸기 ---
+   Q 를 누르면 마우스 자리에 작은 메뉴가 뜬다. 숫자키·클릭으로 고르고 Esc 로 닫는다.
+   도구 패널을 열지 않아도 바로 쓸 수 있다. */
+const QUICK=[
+  {m:'pan', ic:'✋', ko:'이동/선택'},
+  {m:'pen', ic:'✏️', ko:'펜'},
+  {m:'ers', ic:'🧽', ko:'지우개'},
+  {m:'pin', ic:'📍', ko:'핀'},
+  {m:'tok', ic:'♟', ko:'토큰'},
+];
+const qm=document.createElement('div');
+qm.id='quickmenu';
+QUICK.forEach((q,i)=>{
+  const b=document.createElement('button');
+  b.innerHTML=`<b>${i+1}</b><span class="ic">${q.ic}</span><span>${q.ko}</span>`;
+  b.onclick=()=>{ pickQuick(q.m); };
+  qm.appendChild(b);
+});
+stage.appendChild(qm);
+let qmOpen=false, lastMouse={x:0,y:0};
+stage.addEventListener('pointermove',e=>{ lastMouse={x:e.clientX,y:e.clientY}; });
+function pickQuick(m){
+  closeQuick();
+  if(m==='pan'){ setToolOn(false); return; }
+  setToolOn(true); setMode(m);
+}
+function openQuick(){
+  const r=stage.getBoundingClientRect();
+  const x=Math.min(Math.max(8,lastMouse.x-r.left-60), r.width-150);
+  const y=Math.min(Math.max(8,lastMouse.y-r.top-60), r.height-190);
+  qm.style.left=x+'px'; qm.style.top=y+'px';
+  qm.classList.add('on'); qmOpen=true;
+  [...qm.children].forEach((b,i)=>b.classList.toggle('on', QUICK[i].m===(toolOn?mode:'pan')));
+}
+function closeQuick(){ qm.classList.remove('on'); qmOpen=false; }
+stage.addEventListener('pointerdown',e=>{ if(qmOpen && !e.target.closest('#quickmenu')) closeQuick(); },true);
+
+window.addEventListener('keydown',e=>{
+  if(/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName||'')) return;
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  const k=e.key.toLowerCase();
+  if(qmOpen){
+    const n=parseInt(e.key,10);
+    if(n>=1&&n<=QUICK.length){ e.preventDefault(); pickQuick(QUICK[n-1].m); return; }
+    if(k==='escape'||k==='q'){ e.preventDefault(); closeQuick(); return; }
+  }
+  if(k==='q'){ e.preventDefault(); qmOpen?closeQuick():openQuick(); return; }
+  // 한 글자 단축키 — 패널을 열지 않아도 바로 그 도구가 된다
+  const HOT={v:'pan', b:'pen', e:'ers', p:'pin', t:'tok'};
+  if(HOT[k]!==undefined){ e.preventDefault(); pickQuick(HOT[k]); }
+});
+
 setMode('pan');

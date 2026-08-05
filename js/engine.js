@@ -92,7 +92,11 @@ function buildPath(pts, maxT){
         // 같은 초에 실측 스냅샷이 있었으면 그쪽이 사실이므로 건드리지 않는다
         if(has && !dead && p.t!==lastFix){
           const dx=p.x-cx, dy=p.y-cy, d=Math.hypot(dx,dy);
-          if(d>AIM_R){ const f=(d-AIM_R)/d; cx+=dx*f; cy+=dy*f; route=null; }
+          if(d>AIM_R){
+            const f=(d-AIM_R)/d, nx=cx+dx*f, ny=cy+dy*f;
+            // 앵커도 지형을 뚫으면 안 된다 — 막혀 있으면 당기지 않는다
+            if(canGo(cx,cy,nx,ny)){ cx=nx; cy=ny; route=null; }
+          }
         }
       }
       else if(p.src==='s'||p.src==='r'){ cx=p.x; cy=p.y; has=true; dead=false; hasT=false; hasS=false; route=null; lastFix=p.t; }
