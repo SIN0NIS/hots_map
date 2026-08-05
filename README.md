@@ -54,6 +54,7 @@ Heroes of the Storm **리플레이(.StormReplay)를 브라우저에서 바로 �
 | `maps/` | 전장 지도 SVG 19종 — 원본 (약 10MB/장, 「고화질」에서 쓴다) |
 | `maps_lite/` | 같은 지도의 가벼운 판 (약 0.5MB/장, 기본값). `tools/make_lite_maps.py` 로 만든다 |
 | `icons/` | 영웅 미니맵 아이콘 90개 |
+| `talents/` | 특성 아이콘 981개 (44px WebP, 합계 0.8MB). `tools/build_talents.py` 로 만든다 |
 | `samples/` | 예제 리플레이 8개 |
 | `py/` | 리플레이 파서 파이썬 소스 (mpyq + heroprotocol) |
 | `tools/build_data.py` | 자동 생성 파일을 다시 만드는 스크립트 (관리자용) |
