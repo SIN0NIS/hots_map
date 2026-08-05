@@ -45,13 +45,13 @@ function loadMapBySlug(slug){
   const img=new Image();
   img.onload=()=>{
     if(curMapSlug!==slug) return;          // 그 사이 다른 맵을 골랐다
-    bgImg=img;
+    bgImg=img; bgEl.src=img.src;           // 원본 SVG 를 그대로 화면에 얹는다
     bgAutoCal={L:m.cal.L,R:m.cal.R,B:m.cal.B,T:m.cal.T};
     cal={...bgAutoCal};
     // 그림틀은 리플레이가 아니라 맵을 따른다 — 나중에 리플레이를 열어도
     // 화면이 안 흔들리고, 먼저 그려둔 판서·핀이 제자리에 남는다.
     setViewBounds(mapViewBounds(m));
-    syncCalInputs(); setupCanvas(); fit();
+    syncCalInputs(); setupCanvas(); fit(); placeBg();
     hideLoading(); markDirty();
     setStatus(G && uiMode==='replay'
       ? '배경: '+m.ko+' — 구조물 마커와 어긋나면 배경 월드범위로 미세 조정'
@@ -64,14 +64,14 @@ function loadMapBySlug(slug){
 /* --- 직접 올린 배경 (SVG/PNG) --- */
 function applyBg(url, mapW, mapH, label){
   const img=new Image();
-  img.onload=()=>{ bgImg=img;
+  img.onload=()=>{ bgImg=img; bgEl.src=url;
     if(mapW && mapH){ bgAutoCal={L:0,R:mapW,B:0,T:mapH};
       cal={...bgAutoCal};
       if(!G){ setViewBounds({minX:0,maxX:mapW,minY:0,maxY:mapH}); setupCanvas(); fit(); }
       syncCalInputs();
       setStatus(`배경 자동 정렬됨: ${label??''} (${mapW}×${mapH})`); }
     else setStatus('구조물 마커가 배경의 건물과 겹치도록 X/Y 범위를 조절하세요');
-    markDirty(); };
+    placeBg(); markDirty(); };
   img.onerror=()=>alert('이미지를 읽지 못했습니다');
   img.src=url;
 }

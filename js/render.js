@@ -1,17 +1,25 @@
-/* ================= 렌더링 (고정 해상도 캔버스) =================
-   cv = 리플레이 화면 (배경·구조물·영웅), dc = 판서 레이어.
-   줌·팬은 #world 의 CSS transform 하나로 처리하므로 캔버스는 다시 그릴 필요 없다. */
+/* ================= 렌더링 =================
+   층 구성
+     #bgimg  배경 지도 — 원본 SVG 를 그대로 얹는다. 캔버스에 구워 넣으면
+             캔버스 해상도가 화질 상한이 되어 확대할수록 뭉개진다.
+     #dc     판서 — 지도에 붙어 있어야 하므로 월드 좌표계(#world 안).
+     #objs   핀·토큰 — 마찬가지로 월드 좌표계.
+     #cv     리플레이 표기(구조물·이벤트·영웅) — #world 밖의 «화면 해상도»
+             오버레이다. 확대해도 아이콘이 화면 픽셀 그대로 또렷하다.
+   줌·팬은 #world 의 CSS transform 이 처리하고, #cv 는 매 프레임 화면 좌표로 다시 그린다. */
 let G = null;
 let tCur = 0, playing = false, speed = 4, lastTs = 0;
 let bgImg = null, bgAlpha = 0.7, showStruct = true, showHeroIcons = true;
 let cal = null;
-const R = 2;                     // 캔버스 내부 해상도 배율 (고정)
+const R = 2;                     // 월드 좌표계 기준 배율 (예전 캔버스 배율을 그대로 씀)
 
 const stage=document.getElementById('stage'), world=document.getElementById('world');
+const bgEl=document.getElementById('bgimg');
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const dc=document.getElementById('dc'), dctx=dc.getContext('2d');
 const objsEl=document.getElementById('objs');
 let CW=1600, CH=1350;
+let DPR=1;
 
 /* 정지 중 불필요한 다시 그리기를 막는 신호. 화면에 영향을 주는 값이
    바뀔 때 markDirty() 를 부르면 다음 프레임에 한 번 그린다. */
@@ -28,35 +36,50 @@ function setupCanvas(){
   const aspect=(VB.maxX-VB.minX)/(VB.maxY-VB.minY);
   CW=1800; CH=Math.round(CW/aspect);
   if(CH>2000){ CH=2000; CW=Math.round(CH*aspect); }
-  for(const c of [cv,dc]){ c.width=CW; c.height=CH;
-    c.style.width=CW+'px'; c.style.height=CH+'px'; }
+  dc.width=CW; dc.height=CH; dc.style.width=CW+'px'; dc.style.height=CH+'px';
   dctx.lineCap='round'; dctx.lineJoin='round';
   world.style.width=CW+'px'; world.style.height=CH+'px';
-  replayStrokes();
+  placeBg(); resizeOverlay(); replayStrokes();
 }
+/* 화면 해상도 오버레이 크기 맞추기 (창 크기·패널 접힘·DPI 변화) */
+function resizeOverlay(){
+  DPR=Math.min(2, window.devicePixelRatio||1);
+  const w=Math.max(1,stage.clientWidth), h=Math.max(1,stage.clientHeight);
+  const bw=Math.round(w*DPR), bh=Math.round(h*DPR);
+  if(cv.width!==bw||cv.height!==bh){ cv.width=bw; cv.height=bh; }
+  markDirty();
+}
+/* 배경 SVG 를 월드 좌표에 맞춰 CSS 로 앉힌다 (캔버스에 굽지 않는다) */
+function placeBg(){
+  if(!bgImg||!cal){ bgEl.style.display='none'; return; }
+  const [x1,y1]=proj(cal.L,cal.T), [x2,y2]=proj(cal.R,cal.B);
+  bgEl.style.display='block';
+  bgEl.style.left=x1+'px'; bgEl.style.top=y1+'px';
+  bgEl.style.width=(x2-x1)+'px'; bgEl.style.height=(y2-y1)+'px';
+  bgEl.style.opacity=bgAlpha;
+}
+/* 월드 좌표 -> #world 안의 px */
 function proj(x,y){ const B=VB;
   const sx=CW/(B.maxX-B.minX), sy=CH/(B.maxY-B.minY), s=Math.min(sx,sy);
   const ox2=(CW-(B.maxX-B.minX)*s)/2, oy2=(CH-(B.maxY-B.minY)*s)/2;
   return [ox2+(x-B.minX)*s, CH-(oy2+(y-B.minY)*s)]; }
 
 function draw(){
-  if(!G && !bgImg) return;
   needsDraw = false;
-  // 영웅 표시는 화면에서 늘 같은 크기로 보이게 줌을 역보정한다.
-  // (캔버스 전체가 CSS 로 z 배 확대되므로 캔버스 안에서는 1/z 로 그린다)
-  const iz = 1/((typeof z==='number' && z>0) ? z : 1);
-  ctx.clearRect(0,0,CW,CH);
-  if(bgImg && cal){
-    const [x1,y1]=proj(cal.L,cal.T), [x2,y2]=proj(cal.R,cal.B);
-    ctx.globalAlpha=bgAlpha;
-    ctx.drawImage(bgImg, x1, y1, x2-x1, y2-y1);
-    ctx.globalAlpha=1;
-  }
+  ctx.clearRect(0,0,cv.width,cv.height);
   // 리플레이 표기(구조물·이벤트·영웅)는 리플레이 보기에서만 얹는다
   const repView = !!G && (typeof uiMode==='undefined' || uiMode==='replay');
-  if(showStruct && repView && G.structures){
+  if(!repView) return;                 // 맵 보기 — 배경(#bgimg)과 판서만 보인다
+  // 월드 좌표 -> 오버레이 픽셀. 팬·줌을 여기서 직접 반영한다.
+  const zz=(typeof z==='number'&&z>0)?z:1;
+  const OX=(typeof ox==='number')?ox:0, OY=(typeof oy==='number')?oy:0;
+  const S=(x,y)=>{ const p=proj(x,y); return [(p[0]*zz+OX)*DPR, (p[1]*zz+OY)*DPR]; };
+  const ws=zz*DPR;                     // 지도에 붙어 커지는 것 (구조물·그리드·이벤트 링)
+  const ss=DPR;                        // 화면에서 크기가 일정한 것 (영웅 표시)
+  if(showStruct && G.structures){
     for(const s of G.structures){
-      const [px,py]=proj(s.x,s.y), dead = s.deathT<=tCur;
+      const [px,py]=S(s.x,s.y), dead = s.deathT<=tCur;
+      const R=2*ws;
       ctx.globalAlpha = dead? .25 : .85;
       if(/Core|King/.test(s.unit)){ ctx.fillStyle='#e8b64c';
         ctx.beginPath();ctx.arc(px,py,7*R,0,7);ctx.fill();
@@ -79,51 +102,50 @@ function draw(){
     }
   }
   // 그리드
-  ctx.strokeStyle='rgba(120,140,190,.07)'; ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(120,140,190,.07)'; ctx.lineWidth=DPR;
   const B=VB;
-  for(let x=Math.ceil(B.minX/20)*20;x<=B.maxX;x+=20){const[a,b]=proj(x,B.minY),[c,d]=proj(x,B.maxY);ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke();}
-  for(let y=Math.ceil(B.minY/20)*20;y<=B.maxY;y+=20){const[a,b]=proj(B.minX,y),[c,d]=proj(B.maxX,y);ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke();}
-  if(!repView) return;                 // 맵 보기 — 지도와 판서만
+  for(let x=Math.ceil(B.minX/20)*20;x<=B.maxX;x+=20){const[a,b]=S(x,B.minY),[c,d]=S(x,B.maxY);ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke();}
+  for(let y=Math.ceil(B.minY/20)*20;y<=B.maxY;y+=20){const[a,b]=S(B.minX,y),[c,d]=S(B.maxX,y);ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke();}
   // 최근 이벤트 링
   for(const e of G.evs){
     if(e.t>tCur||tCur-e.t>5) continue;
     const x=e.PositionX??e.x, y=e.PositionY??e.y; if(x==null) continue;
-    const [px,py]=proj(x,y), k=(tCur-e.t)/5;
-    ctx.beginPath(); ctx.arc(px,py,(8+k*26)*R,0,7);
+    const [px,py]=S(x,y), k=(tCur-e.t)/5;
+    ctx.beginPath(); ctx.arc(px,py,(8+k*26)*2*ws,0,7);
     ctx.strokeStyle = CAT(e)==='kill' ? `rgba(255,95,109,${.8*(1-k)})` : `rgba(232,182,76,${.8*(1-k)})`;
-    ctx.lineWidth=2*R; ctx.stroke();
+    ctx.lineWidth=4*ws; ctx.stroke();
   }
-  // 영웅 — 크기는 전부 iz 를 곱해 화면상 일정하게 유지한다
-  const fs = 11*R*iz;
+  // 영웅 — 화면상 크기가 늘 일정하도록 ss(=DPR)만 곱한다
+  const fs = 22*ss;
   ctx.textAlign='center';
   for(const lab in G.heroes){
     const hh=G.heroes[lab], col = hh.team===0?'#4da3ff':'#ff5f6d';
     for(let k=8;k>=1;k--){
       const p=posAt(hh,tCur-k*0.5); if(!p||p.dead) continue;
-      const [px,py]=proj(p.x,p.y);
-      ctx.beginPath(); ctx.arc(px,py,3*R*iz,0,7);
+      const [px,py]=S(p.x,p.y);
+      ctx.beginPath(); ctx.arc(px,py,6*ss,0,7);
       ctx.fillStyle=col+Math.round(18-k*2).toString(16).padStart(2,'0'); ctx.fill();
     }
     const p=posAt(hh,tCur); if(!p) continue;
-    const [px,py]=proj(p.x,p.y);
+    const [px,py]=S(p.x,p.y);
     if(p.dead){ ctx.fillStyle='rgba(150,160,180,.6)';
       ctx.font=`${fs}px sans-serif`; ctx.fillText('✕',px,py+fs*.35); continue; }
     const img = showHeroIcons && hh.img && hh.img.complete && hh.img.naturalWidth ? hh.img : null;
     if(img){
       // 미니맵 아이콘: 팀색 테두리 원 안에 초상화
-      const r = 9*R*iz;
+      const r = 18*ss;
       ctx.save();
       ctx.beginPath(); ctx.arc(px,py,r,0,7); ctx.clip();
       ctx.drawImage(img, px-r, py-r, r*2, r*2);
       ctx.restore();
       ctx.beginPath(); ctx.arc(px,py,r,0,7);
-      ctx.lineWidth=2.2*R*iz; ctx.strokeStyle=col; ctx.stroke();
-      ctx.beginPath(); ctx.arc(px,py,r+1.1*R*iz,0,7);
-      ctx.lineWidth=1*R*iz; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
+      ctx.lineWidth=4.4*ss; ctx.strokeStyle=col; ctx.stroke();
+      ctx.beginPath(); ctx.arc(px,py,r+2.2*ss,0,7);
+      ctx.lineWidth=2*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
     }else{
-      ctx.beginPath(); ctx.arc(px,py,6*R*iz,0,7);
+      ctx.beginPath(); ctx.arc(px,py,12*ss,0,7);
       ctx.fillStyle=col; ctx.fill();
-      ctx.lineWidth=2*R*iz; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
+      ctx.lineWidth=4*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
     }
   }
 }

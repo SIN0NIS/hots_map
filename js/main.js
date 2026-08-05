@@ -24,7 +24,8 @@ function setUIMode(m){
     setTeamHint();                           // 팀 명단은 리플레이 보기에서만
   }
   logCount=-1; markDirty();
-  requestAnimationFrame(fit);                // 패널이 접혔다 펴지므로 크기를 다시 잡는다
+  // 패널이 접혔다 펴지므로 오버레이 크기와 화면 맞춤을 다시 잡는다
+  requestAnimationFrame(()=>{ resizeOverlay(); fit(); });
 }
 document.querySelectorAll('#modebar .tab').forEach(b=>
   b.onclick=()=>setUIMode(b.dataset.mode));
@@ -61,8 +62,8 @@ const calL=document.getElementById('calL'), calR=document.getElementById('calR')
 function syncCalInputs(){ if(!cal) return;
   calL.value=cal.L; calR.value=cal.R; calB.value=cal.B; calT.value=cal.T; }
 for(const [el,k] of [[calL,'L'],[calR,'R'],[calB,'B'],[calT,'T']])
-  el.oninput=()=>{ if(cal){ cal[k]=+el.value; markDirty(); } };
-document.getElementById('bgAlpha').oninput=e=>{ bgAlpha=e.target.value/100; markDirty(); };
+  el.oninput=()=>{ if(cal){ cal[k]=+el.value; placeBg(); markDirty(); } };
+document.getElementById('bgAlpha').oninput=e=>{ bgAlpha=e.target.value/100; placeBg(); };
 document.getElementById('showStruct').onchange=e=>{ showStruct=e.target.checked; markDirty(); };
 document.getElementById('heroIconTgl').onchange=e=>{ showHeroIcons=e.target.checked; markDirty(); };
 

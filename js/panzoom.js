@@ -66,4 +66,4 @@ function vEnd(e){ vpts.delete(e.pointerId);
   if(vpts.size===0){ vdrag=null; stage.classList.remove('drag'); } }
 stage.addEventListener('pointerup',vEnd);
 stage.addEventListener('pointercancel',vEnd);
-window.addEventListener('resize',fit);
+window.addEventListener('resize',()=>{ resizeOverlay(); fit(); });

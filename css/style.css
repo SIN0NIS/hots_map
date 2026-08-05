@@ -41,7 +41,11 @@ main{flex:1;display:flex;min-height:0}
 #stage.drag{cursor:grabbing}
 #world{position:absolute;left:0;top:0;transform-origin:0 0}
 #world canvas{position:absolute;left:0;top:0;user-select:none;-webkit-user-drag:none}
+/* 배경은 캔버스에 굽지 않고 원본 SVG 그대로 얹는다 — 확대해도 원본 화질이 나온다 */
+#bgimg{position:absolute;left:0;top:0;user-select:none;-webkit-user-drag:none;display:none}
 #objs{position:absolute;left:0;top:0}
+/* 리플레이 표기는 화면 해상도 오버레이에 그린다 (확대해도 아이콘이 안 뭉개진다) */
+#cv{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:3}
 /* ---- 줌 바 ---- */
 #zbar{position:absolute;left:10px;bottom:10px;display:flex;gap:5px;align-items:center;
   background:rgba(22,28,40,.92);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px;z-index:5}

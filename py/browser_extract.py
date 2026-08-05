@@ -39,6 +39,13 @@ def extract(path):
     tracks = defaultdict(list)     # pid -> [sec, x, y, src]
     structures = []                # 게임 시작 시 구조물 좌표 (SVG 정렬용)
 
+    # 플레이어의 «본체» 영웅 유닛만 추적한다.
+    # 이름이 Hero 로 시작한다고 다 본체가 아니다: D.Va 조종사(HeroDVaPilot),
+    # 첸의 정령(HeroChenStorm...), 아바투르 궁극 진화체, 사무로 분신 등이 섞이면
+    # 한 트랙 안에서 좌표가 널뛴다. 경기 시작 때 태어난 것을 본체로 본다.
+    main_unit = {}                 # pid -> 본체 유닛 이름
+    hero_idx = {}                  # unitTagIndex -> pid (본체만)
+
     tracker = protocol.decode_replay_tracker_events(archive.read_file("replay.tracker.events"))
     for ev in tracker:
         sec, et = ev["_gameloop"] // 16, ev["_event"]
@@ -46,21 +53,35 @@ def extract(path):
         if et == "NNet.Replay.Tracker.SUnitBornEvent":
             idx = ev["m_unitTagIndex"]
             uname = ds(ev["m_unitTypeName"])
-            tag_index_info[idx] = {"name": uname, "control": ev["m_controlPlayerId"]}
-            if uname.startswith("Hero"):
-                tracks[ev["m_controlPlayerId"]].append([sec, ev["m_x"], ev["m_y"], "s"])
+            pid = ev["m_controlPlayerId"]
+            tag_index_info[idx] = {"name": uname, "control": pid}
+            hero_idx.pop(idx, None)          # 태그 번호는 재사용된다 — 옛 주인을 지운다
+            if uname.startswith("Hero") and 1 <= pid <= 10:
+                if pid not in main_unit:
+                    main_unit[pid] = uname
+                if uname == main_unit[pid]:
+                    hero_idx[idx] = pid
+                    tracks[pid].append([sec, ev["m_x"], ev["m_y"], "s"])
             elif ev["_gameloop"] < 16 and any(k in uname for k in
                     ("TownHall", "CannonTower", "Moonwell", "Core", "GateL",
                      "WallRadial", "MercCampCaptureBeacon", "King")):
                 structures.append({"unit": uname, "x": ev["m_x"], "y": ev["m_y"]})
 
+        elif et == "NNet.Replay.Tracker.SUnitRevivedEvent":
+            # 부활은 새 유닛이 아니라 같은 유닛의 되살아남이다. 이걸 안 읽으면
+            # 영웅이 죽은 자리에 ✕ 로 얼어붙은 채 다음 위치 스냅샷(15초 주기)까지 남는다.
+            pid = hero_idx.get(ev["m_unitTagIndex"])
+            if pid:
+                tracks[pid].append([sec, ev["m_x"], ev["m_y"], "r"])
+
         elif et == "NNet.Replay.Tracker.SUnitDiedEvent":
             idx = ev["m_unitTagIndex"]
             info = tag_index_info.get(idx, {})
             uname = info.get("name", "?")
-            if uname.startswith("Hero"):
-                tracks[info.get("control")].append([sec, ev["m_x"], ev["m_y"], "d"])
-            elif "Town" in uname or "Core" in uname:
+            pid = hero_idx.get(idx)
+            if pid:
+                tracks[pid].append([sec, ev["m_x"], ev["m_y"], "d"])
+            elif not uname.startswith("Hero") and ("Town" in uname or "Core" in uname):
                 timeline.append({"t": sec, "e": "structure_died", "unit": uname,
                                  "x": ev["m_x"], "y": ev["m_y"]})
 
@@ -69,9 +90,9 @@ def extract(path):
             items = ev["m_items"]
             for i in range(0, len(items), 3):
                 idx += items[i]
-                info = tag_index_info.get(idx)
-                if info and info["name"].startswith("Hero"):
-                    tracks[info["control"]].append([sec, items[i+1], items[i+2], "c"])
+                pid = hero_idx.get(idx)
+                if pid:
+                    tracks[pid].append([sec, items[i+1], items[i+2], "c"])
 
         elif et == "NNet.Replay.Tracker.SStatGameEvent":
             name = ds(ev["m_eventName"])
@@ -97,12 +118,16 @@ def extract(path):
             rec.pop("GameTime", None)   # t와 중복
             timeline.append(rec)
 
-    # 이동/공격 명령: 플레이어당 초당 1개로 다운샘플
-    commands = defaultdict(list)    # 플레이어이름 -> [sec, x, y]
+    # 이동/공격 명령: 플레이어당 초당 1개로 다운샘플.
+    # m_abil 이 있는 것은 «스킬을 그 지점에 쓴 것»이라 이동 목적지가 아니다.
+    # (갈처럼 이동 명령이 아예 없는 영웅은 스킬 조준점이 전부 이동으로 오인됐다)
+    commands = defaultdict(list)    # userId -> [sec, x, y]
     last_sec = {}
     game_events = protocol.decode_replay_game_events(archive.read_file("replay.game.events"))
     for ev in game_events:
         if ev["_event"] != "NNet.Game.SCmdEvent":
+            continue
+        if ev.get("m_abil") is not None:
             continue
         data = ev.get("m_data") or {}
         target = data.get("TargetPoint") or ((data.get("TargetUnit") or {}).get("m_snapshotPoint"))
@@ -119,12 +144,14 @@ def extract(path):
     timeline.sort(key=lambda e: e["t"])
     out = {
         "map": ds(details["m_title"]),
-        "format_note": "t는 게임 시작 후 초. tracks/commands 항목은 [초,x,y(,출처)] 배열. 출처 s=스폰 c=전투스냅샷 d=사망",
+        "format_note": "t는 게임 시작 후 초. tracks/commands 항목은 [초,x,y(,출처)] 배열. "
+                       "출처 s=스폰 c=전투스냅샷 d=사망 r=부활",
         "players": players,
         "structures": structures,
         "hero_position_tracks": {pname(pid): pts for pid, pts in tracks.items()},
-        "movement_commands": {(players.get(uid, {}) or {}).get("name", f"user{uid}"): pts
-                              for uid, pts in commands.items()},
+        # 키를 «이름»이 아니라 트랙과 같은 «이름(영웅)» 라벨로 쓴다. 예전에는 이름으로
+        # 묶어서 동명이인이 있으면 한 명의 이동명령이 통째로 사라졌다.
+        "movement_commands": {pname(uid + 1): pts for uid, pts in commands.items()},
         "timeline": timeline,
     }
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))

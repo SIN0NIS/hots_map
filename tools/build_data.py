@@ -128,6 +128,23 @@ def build_samples():
     write(os.path.join(ROOT, "js", "data_samples.js"), out)
 
 
+def build_demo(slug="cursed_hollow"):
+    """첫 화면 데모를 samples/ 의 리플레이에서 지금 파서로 다시 뽑는다."""
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(ROOT, "py"))
+    import browser_extract
+    src = os.path.join(ROOT, "samples", f"{slug}.StormReplay")
+    if not os.path.isfile(src):
+        print(f"  데모 원본 없음: {src}")
+        return
+    raw = json.loads(browser_extract.extract(src))
+    out = ("// 첫 화면 데모 리플레이 — tools/build_data.py --demo 로 다시 만든다.\n"
+           f"// 원본: samples/{slug}.StormReplay\n"
+           "const DEMO_REPLAY = " + json.dumps(raw, ensure_ascii=False,
+                                               separators=(",", ":")) + ";\n")
+    write(os.path.join(ROOT, "js", "demo_replay.js"), out)
+
+
 def extract_legacy():
     """기존 단일 파일에서 py 소스와 데모 리플레이를 꺼낸다 (한 번만)."""
     legacy = os.path.join(ROOT, "replay_tactics_viewer.html")
@@ -159,6 +176,8 @@ def write(path, text):
 if __name__ == "__main__":
     if "--extract-legacy" in sys.argv:
         extract_legacy()
+    if "--demo" in sys.argv:
+        build_demo()
     build_py_bundle()
     build_maps()
     build_samples()
