@@ -69,6 +69,9 @@ document.getElementById('heroIconTgl').onchange=e=>{ showHeroIcons=e.target.chec
 
 /* --- 리플레이 로드 --- */
 function load(raw){
+  // 경로를 계산하기 전에 지형부터 올려야 한다 (prepare 안에서 길찾기를 쓴다)
+  const mm=matchMap(raw.map);
+  if(mm) loadPathing(mm.slug, mm.W, mm.H); else loadPathing('', 0, 0);
   G=prepare(raw); tCur=0; playing=false; logCount=-1;
   playBtn.textContent='▶ 재생';
   document.getElementById('mapName').textContent=raw.map||'';

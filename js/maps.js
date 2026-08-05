@@ -46,6 +46,7 @@ function loadMapBySlug(slug, keepView){
   const m=MAP_DB.find(x=>x.slug===slug);
   if(!m) return;
   curMapSlug=slug; mapSel.value=slug;
+  loadPathing(slug, m.W, m.H);           // 이 전장의 통행 격자 (지형 충돌·길찾기용)
   const src=mapFile(m);
   const mb=(!hiRes && m.lite) ? m.liteMb : m.mb;
   showLoading(`맵 불러오는 중… ${m.ko}${mb?` (${mb}MB)`:''}`);

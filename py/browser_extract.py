@@ -121,13 +121,12 @@ def extract(path):
     # 이동/공격 명령: 플레이어당 초당 1개로 다운샘플.
     # m_abil 이 있는 것은 «스킬을 그 지점에 쓴 것»이라 이동 목적지가 아니다.
     # (갈처럼 이동 명령이 아예 없는 영웅은 스킬 조준점이 전부 이동으로 오인됐다)
-    commands = defaultdict(list)    # userId -> [sec, x, y]
-    last_sec = {}
+    commands = defaultdict(list)    # userId -> [sec, x, y]   순수 이동 명령
+    aims = defaultdict(list)        # userId -> [sec, x, y]   스킬 조준점
+    last_sec, last_aim = {}, {}
     game_events = protocol.decode_replay_game_events(archive.read_file("replay.game.events"))
     for ev in game_events:
         if ev["_event"] != "NNet.Game.SCmdEvent":
-            continue
-        if ev.get("m_abil") is not None:
             continue
         data = ev.get("m_data") or {}
         target = data.get("TargetPoint") or ((data.get("TargetUnit") or {}).get("m_snapshotPoint"))
@@ -135,10 +134,20 @@ def extract(path):
             continue
         uid = ev["_userid"]["m_userId"]
         sec = ev["_gameloop"] // 16
+        pt = [sec, round(target["x"] / 4096.0, 1), round(target["y"] / 4096.0, 1)]
+        if ev.get("m_abil") is not None:
+            # 스킬을 그 지점에 썼다 = «그때 사거리 안에 있었다»는 약한 단서다.
+            # 이동 목적지로 쓰면 안 된다 (갈처럼 이동 명령이 없는 영웅이 끌려간다).
+            if last_aim.get(uid) == sec:
+                aims[uid][-1] = pt
+            else:
+                aims[uid].append(pt)
+                last_aim[uid] = sec
+            continue
         if last_sec.get(uid) == sec:     # 같은 초의 명령은 마지막 것으로 교체
-            commands[uid][-1] = [sec, round(target["x"]/4096.0, 1), round(target["y"]/4096.0, 1)]
+            commands[uid][-1] = pt
         else:
-            commands[uid].append([sec, round(target["x"]/4096.0, 1), round(target["y"]/4096.0, 1)])
+            commands[uid].append(pt)
             last_sec[uid] = sec
 
     timeline.sort(key=lambda e: e["t"])
@@ -152,6 +161,7 @@ def extract(path):
         # 키를 «이름»이 아니라 트랙과 같은 «이름(영웅)» 라벨로 쓴다. 예전에는 이름으로
         # 묶어서 동명이인이 있으면 한 명의 이동명령이 통째로 사라졌다.
         "movement_commands": {pname(uid + 1): pts for uid, pts in commands.items()},
+        "ability_aims": {pname(uid + 1): pts for uid, pts in aims.items()},
         "timeline": timeline,
     }
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
