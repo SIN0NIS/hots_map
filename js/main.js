@@ -43,7 +43,7 @@ function tick(ts){
     if(G && uiMode==='replay'){
       seek.value=tCur/G.maxT*100;
       clock.firstChild.textContent=fmtT(tCur);
-      renderLog();
+      renderLog(); updateTeamBar();
     }
     draw();
   }
@@ -103,8 +103,9 @@ function load(raw){
     syncCalInputs();
   }
   document.body.classList.add('has-replay');
+  buildTeamBar();
   setUIMode('replay');            // 리플레이를 열면 바로 재생 화면으로
-  markDirty(); renderLog();
+  markDirty(); renderLog(); updateTeamBar();
 }
 /* 리플레이 보기에서 전장이 어긋나지 않도록 맵 선택을 잠근다.
    (맵 보기에서는 항상 풀려 있어 자유롭게 전장을 구경할 수 있다) */
@@ -121,6 +122,7 @@ closeRep.onclick=()=>{
   setTeamHint();
   logEl.innerHTML='<div class="empty">리플레이를 열면 이벤트가 여기에 표시됩니다</div>';
   document.body.classList.remove('has-replay');
+  buildTeamBar();
   setUIMode('map');
 };
 function setTeamHint(){

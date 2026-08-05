@@ -116,8 +116,6 @@ function draw(){
     ctx.lineWidth=4*ws; ctx.stroke();
   }
   // 영웅 — 화면상 크기가 늘 일정하도록 ss(=DPR)만 곱한다
-  const fs = 22*ss;
-  ctx.textAlign='center';
   for(const lab in G.heroes){
     const hh=G.heroes[lab], col = hh.team===0?'#4da3ff':'#ff5f6d';
     for(let k=8;k>=1;k--){
@@ -128,24 +126,35 @@ function draw(){
     }
     const p=posAt(hh,tCur); if(!p) continue;
     const [px,py]=S(p.x,p.y);
-    if(p.dead){ ctx.fillStyle='rgba(150,160,180,.6)';
-      ctx.font=`${fs}px sans-serif`; ctx.fillText('✕',px,py+fs*.35); continue; }
     const img = showHeroIcons && hh.img && hh.img.complete && hh.img.naturalWidth ? hh.img : null;
+    // 사망 중에는 죽은 자리에 초상화를 «회색으로» 남긴다 (부활하면 원래 색으로 돌아온다)
+    if(p.dead) ctx.globalAlpha=0.45;
     if(img){
       // 미니맵 아이콘: 팀색 테두리 원 안에 초상화
       const r = 18*ss;
       ctx.save();
       ctx.beginPath(); ctx.arc(px,py,r,0,7); ctx.clip();
+      if(p.dead) ctx.filter='grayscale(1) brightness(.75)';
       ctx.drawImage(img, px-r, py-r, r*2, r*2);
       ctx.restore();
       ctx.beginPath(); ctx.arc(px,py,r,0,7);
-      ctx.lineWidth=4.4*ss; ctx.strokeStyle=col; ctx.stroke();
+      ctx.lineWidth=4.4*ss; ctx.strokeStyle=p.dead?'#7d8aa5':col; ctx.stroke();
       ctx.beginPath(); ctx.arc(px,py,r+2.2*ss,0,7);
       ctx.lineWidth=2*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
     }else{
       ctx.beginPath(); ctx.arc(px,py,12*ss,0,7);
-      ctx.fillStyle=col; ctx.fill();
+      ctx.fillStyle=p.dead?'#5a6577':col; ctx.fill();
       ctx.lineWidth=4*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
+    }
+    if(p.dead){
+      // 죽었다는 것이 한눈에 보이게 회색 테두리 위에 옅은 ✕ 를 겹친다
+      const r=(img?18:12)*ss;
+      ctx.strokeStyle='rgba(230,236,245,.75)'; ctx.lineWidth=2.4*ss;
+      ctx.beginPath();
+      ctx.moveTo(px-r*.55,py-r*.55); ctx.lineTo(px+r*.55,py+r*.55);
+      ctx.moveTo(px+r*.55,py-r*.55); ctx.lineTo(px-r*.55,py+r*.55);
+      ctx.stroke();
+      ctx.globalAlpha=1;
     }
   }
 }

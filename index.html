@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>히오스 전장 기록 재생기 + 전술 보드</title>
-<link rel="stylesheet" href="css/style.css?v=5">
+<link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body class="mode-map">
 <nav id="modebar">
@@ -15,6 +15,11 @@
   </div>
   <span class="map-name" id="mapName"></span>
 </nav>
+<div id="teambar">
+  <div class="side t0" id="team0"></div>
+  <div class="vs">VS</div>
+  <div class="side t1" id="team1"></div>
+</div>
 <header>
   <span class="teams" id="teamInfo"></span>
   <span class="hgroup">
@@ -104,18 +109,20 @@
     <div id="log"><div class="empty">리플레이를 열면 이벤트가 여기에 표시됩니다</div></div>
   </aside>
 </main>
-<script src="js/data_maps.js?v=5"></script>
-<script src="js/data_heroes.js?v=5"></script>
-<script src="js/data_samples.js?v=5"></script>
-<script src="js/demo_replay.js?v=5"></script>
-<script src="js/py_bundle.js?v=5"></script>
-<script src="js/engine.js?v=5"></script>
-<script src="js/render.js?v=5"></script>
-<script src="js/log.js?v=5"></script>
-<script src="js/panzoom.js?v=5"></script>
-<script src="js/tools.js?v=5"></script>
-<script src="js/maps.js?v=5"></script>
-<script src="js/parser.js?v=5"></script>
-<script src="js/main.js?v=5"></script>
+<script src="js/data_maps.js?v=7"></script>
+<script src="js/data_heroes.js?v=7"></script>
+<script src="js/data_talents.js?v=7"></script>
+<script src="js/data_samples.js?v=7"></script>
+<script src="js/demo_replay.js?v=7"></script>
+<script src="js/py_bundle.js?v=7"></script>
+<script src="js/engine.js?v=7"></script>
+<script src="js/render.js?v=7"></script>
+<script src="js/log.js?v=7"></script>
+<script src="js/teambar.js?v=7"></script>
+<script src="js/panzoom.js?v=7"></script>
+<script src="js/tools.js?v=7"></script>
+<script src="js/maps.js?v=7"></script>
+<script src="js/parser.js?v=7"></script>
+<script src="js/main.js?v=7"></script>
 </body>
 </html>
