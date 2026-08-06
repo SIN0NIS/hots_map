@@ -10,6 +10,7 @@
 let G = null;
 let tCur = 0, playing = false, speed = 4, lastTs = 0;
 let bgImg = null, bgAlpha = 0.7, showStruct = true, showHeroIcons = true;
+let showConf = true;             // 위치 신뢰도를 흐림·점선 원으로 표시
 let cal = null;
 const R = 2;                     // 월드 좌표계 기준 배율 (예전 캔버스 배율을 그대로 씀)
 /* 캔버스는 CSS 변수를 읽지 못한다. css/style.css 의 토큰과 같은 색을 hex 로 적어 둔다
@@ -150,8 +151,19 @@ function draw(){
     const p=posAt(hh,tCur); if(!p) continue;
     const [px,py]=S(p.x,p.y);
     const img = showHeroIcons && hh.img && hh.img.complete && hh.img.naturalWidth ? hh.img : null;
+    /* 신뢰도 — 재구성이 완벽할 수 없으므로 «확실한 곳»과 «짐작»을 구분해 준다.
+       실측 앵커에서 멀수록 흐려지고, 둘레에 불확실 반경을 옅게 그린다.
+       (홀드아웃에서 앵커 공백이 길수록 오차가 커지는 것을 그대로 옮긴 것) */
+    const conf = showConf && p.conf!=null ? p.conf : 1;
+    if(showConf && conf<0.85 && !p.dead){
+      const r0 = HERO_R*ss, rr = r0 + (1-conf)*46*ss;
+      ctx.beginPath(); ctx.arc(px,py,rr,0,7);
+      ctx.strokeStyle = col + Math.round(28*(1-conf)+10).toString(16).padStart(2,'0');
+      ctx.lineWidth = 2*ss; ctx.setLineDash([4*ss,4*ss]); ctx.stroke(); ctx.setLineDash([]);
+    }
     // 사망 중에는 죽은 자리에 초상화를 «회색으로» 남긴다 (부활하면 원래 색으로 돌아온다)
     if(p.dead) ctx.globalAlpha=0.45;
+    else if(showConf) ctx.globalAlpha=0.45+0.55*conf;
     if(img){
       // 미니맵 아이콘: 팀색 테두리 원 안에 초상화
       const r = HERO_R*ss;

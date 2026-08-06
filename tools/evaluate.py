@@ -20,12 +20,22 @@
   15초 주기 위치 스냅샷(c)도 남긴다. 그것까지 가리면 30초 공백이 생겨 실제
   운영 조건(15초)보다 어려운 문제를 푸는 셈이라 오차가 과대평가된다.
 
-  표본을 늘리려고 «하나씩 빼기»(leave-one-out)를 쓴다. 사망 하나를 가리고 나머지
-  전부로 재구성하기를 사망 개수만큼 되풀이한다. 20% 무작위보다 표본이 5배 많다.
+  표본을 늘리려고 «하나씩 빼기»(leave-one-out)를 쓴다. 하나를 가리고 나머지
+  전부로 재구성하기를 앵커 개수만큼 되풀이한다.
 
-  python tools/evaluate.py                     # 전체 리플레이, 모든 모델
-  python tools/evaluate.py --models linear     # 특정 모델만
-  python tools/evaluate.py --replay sky_temple
+가리는 대상 두 가지 (--target)
+  d  사망 앵커. 오차 0 인 참값이라 «절대 수치» 가 정직하다.
+     다만 사망은 «전투가 끝나는 순간» 이라 표본이 한쪽으로 쏠린다.
+     실제로 도달가능성 제약은 궤적을 바꾸는데도 사망 163건 중 0건에만 닿아
+     «효과 없음» 처럼 보였다.
+  c  15초 주기 위치 스냅샷. 경기 전체에 고르게 깔려 있어 «모델 비교» 에 낫다.
+     대신 하나를 가리면 그 자리에 30초 공백이 생겨 실제 운영 조건(15초)보다
+     어려운 문제를 푸는 셈이라 절대 오차는 과대평가된다.
+     모든 모델이 똑같이 불리하므로 «어느 쪽이 나은가» 는 그대로 읽을 수 있다.
+
+  python tools/evaluate.py                        # 사망 앵커 기준
+  python tools/evaluate.py --target c --stride 3   # 스냅샷 기준 (3개마다 하나)
+  python tools/evaluate.py --models linear --replay sky_temple
 """
 import argparse, glob, math, statistics, sys
 from pathlib import Path
@@ -37,7 +47,8 @@ import recon_data                                          # noqa: E402
 import recon_models                                        # noqa: E402
 
 
-HOLDOUT_SRC = ("d",)              # 가릴 앵커 종류 (사망 = 오차 0 이고 매번 다른 자리)
+# 가릴 앵커 종류. 부활(r)은 절대 가리지 않는다 — 좌표가 양 팀 부활 지점 8개뿐이라
+# 어떤 이동 모델도 맞힐 수 없는 순간이동이다 (가려 봤더니 오차 100타일).
 
 
 # ── 계층 나누기 ─────────────────────────────────────────────────────
@@ -61,7 +72,7 @@ def fight_bucket(t, deaths, window=12.0):
 
 
 # ── 평가 ────────────────────────────────────────────────────────────
-def evaluate_replay(path, model_names):
+def evaluate_replay(path, model_names, target="d", stride=1):
     rep = recon_data.load_replay(path)
     walk = recon_data.walk_for(rep)
     tracks = rep["hero_position_tracks"]
@@ -71,7 +82,8 @@ def evaluate_replay(path, model_names):
     rows = []
     for lab, pts in tracks.items():
         pts = sorted(pts, key=lambda p: p[0])
-        cand = [i for i, p in enumerate(pts) if len(p) > 3 and p[3] in HOLDOUT_SRC]
+        cand = [i for i, p in enumerate(pts) if len(p) > 3 and p[3] == target]
+        cand = cand[::stride]
         if not cand:
             continue
         for i in cand:                       # 하나씩 빼기
@@ -128,6 +140,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--replay", default="")
     ap.add_argument("--models", default=",".join(recon_models.MODELS))
+    ap.add_argument("--target", default="d", choices=["d", "c"])
+    ap.add_argument("--stride", type=int, default=1)
     a = ap.parse_args()
 
     files = sorted(glob.glob(str(ROOT / "samples" / "*.StormReplay")))
@@ -138,13 +152,15 @@ def main():
     rows = []
     for f in files:
         print(f"  … {Path(f).stem}", flush=True)
-        rows += evaluate_replay(f, models)
+        rows += evaluate_replay(f, models, a.target, a.stride)
 
     if not rows:
         print("표본이 없습니다."); return
 
-    print(f"\n{'='*72}\n홀드아웃 검증 — 리플레이 {len(files)}판 · 가린 앵커 {len(rows)//len(models)}개"
-          f" (사망 하나씩 빼기) · 단위 = 게임 타일\n{'='*72}")
+    what = "사망" if a.target == "d" else "위치 스냅샷"
+    note = "" if a.target == "d" else "  ※ 스냅샷을 가리면 30초 공백이 생겨 절대 수치는 과대평가다 — 모델 «비교» 용"
+    print(f"\n{'='*72}\n홀드아웃 검증 — 리플레이 {len(files)}판 · 가린 {what} 앵커 "
+          f"{len(rows)//len(models)}개 (하나씩 빼기) · 단위 = 게임 타일{note}\n{'='*72}")
     print(f"\n{'모델':<22}{'표본':>7}{'평균':>8}{'중앙':>8}{'p95':>8}")
     for m in models:
         s = stats([r["err"] for r in rows if r["model"] == m])

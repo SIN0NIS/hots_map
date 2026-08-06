@@ -92,7 +92,7 @@ def hero_role(rep, lab):
     return _ROLE.get(m.group(1), "") if m else ""
 
 
-def _merge(anchors, rep, lab, use_kills=(), cmds=True, aims=True):
+def _merge(anchors, rep, lab, use_kills=(), cmds=True, aims=True, amove=False):
     """앵커에 이동 명령(m)·스킬 조준점(a)·잡은 것(k)을 시간순으로 섞는다."""
     pts = [{"t": p[0], "x": p[1], "y": p[2],
             "src": p[3] if len(p) > 3 else "c"} for p in anchors]
@@ -102,6 +102,10 @@ def _merge(anchors, rep, lab, use_kills=(), cmds=True, aims=True):
     if aims:
         for a in (rep.get("ability_aims") or {}).get(lab, []):
             pts.append({"t": a[0], "x": a[1], "y": a[2], "src": "a"})
+    if amove:
+        # 어택무브를 이동 명령과 똑같이 다룬다
+        for a in (rep.get("attack_moves") or {}).get(lab, []):
+            pts.append({"t": a[0], "x": a[1], "y": a[2], "src": "m"})
     if use_kills:
         melee = hero_role(rep, lab) in MELEE_ROLES
         if melee or not MELEE_ONLY:
@@ -116,10 +120,44 @@ def _merge(anchors, rep, lab, use_kills=(), cmds=True, aims=True):
 
 PATH_MIN_DIST = 14.0   # 이보다 가까우면 길찾기를 하지 않는다 (뷰어와 같은 값)
 
+# 도달가능성 제약에 쓰는 «넉넉한» 최대 속도.
+# 실측: 연달아 나온 실측 위치 사이의 요구 속도가 p99 6.15 · p99.5 6.87 타일/초다
+# (직선거리 기준이라 하한이고, 탈것은 +30% 라 7 근처가 상한이다).
+# 좁게 잡으면 멀쩡한 이동을 틀렸다고 당기므로 7.5 로 여유를 둔다.
+VMAX = 7.5
+
+# Forward-Backward 에서 «역방향을 믿는» 시간 폭 (초).
+TAU = 6.0
+
+
+def _reach_clamp(xs, ys, fl, hard, vmax=VMAX):
+    """뒤에 오는 실측 앵커에서 «도달 가능한 범위» 안으로 당긴다.
+
+    앞으로만 도는 시뮬레이션은 미래를 못 본다. 오프라인 처리의 가장 큰 이점이
+    «나중에 저기 있었다는 사실» 인데 그걸 통째로 버리고 있었다.
+    t 시점의 위치는 다음 실측 앵커 B(tb) 에서 vmax*(tb-t) 안에 있어야 한다.
+    그 밖이면 물리적으로 불가능하므로 경계까지 당긴다.
+    """
+    n = len(xs)
+    prev_k = 0
+    for tb, bx, by in hard:
+        kb = min(n - 1, int(tb / PDT))
+        for k in range(kb - 1, prev_k - 1, -1):
+            if fl[k] != 1:          # 사망 구간 너머로는 넘어가지 않는다 (부활은 순간이동)
+                break
+            allow = vmax * (tb - k * PDT)
+            dx, dy = bx - xs[k], by - ys[k]
+            d = math.hypot(dx, dy)
+            if d > allow:
+                f = (d - allow) / d
+                xs[k] += dx * f
+                ys[k] += dy * f
+        prev_k = kb
+
 def viewer(anchors, rep, lab, walk, dur, use_kills=(), cmds=True, aims=True,
-           terrain=True, astar=True):
+           terrain=True, astar=True, reach=False, amove=False, _raw=False):
     """스냅샷 우선 + 이동 명령 + 지형 충돌 + A* 길찾기 (js/engine.js buildPath 이식)."""
-    pts = _merge(anchors, rep, lab, use_kills, cmds, aims)
+    pts = _merge(anchors, rep, lab, use_kills, cmds, aims, amove)
     if not terrain:
         walk = None
     n = int((dur + PDT) / PDT) + 1
@@ -233,10 +271,76 @@ def viewer(anchors, rep, lab, walk, dur, use_kills=(), cmds=True, aims=True,
                         break
         xs[k], ys[k], fl[k] = cx, cy, (2 if dead else (1 if has else 0))
 
+    # 부활(r)은 «앵커» 로 쓰지 않는다 — 순간이동이라 «거기서 도달 가능한 범위»
+    # 라는 말이 성립하지 않는다. 넣었더니 사망 전 구간을 통째로 기지 쪽으로
+    # 끌어당겨 오차가 5.3 -> 13.3 으로 뛰었다.
+    hard = sorted((p["t"], p["x"], p["y"]) for p in pts
+                  if p["src"] in ("c", "s", "d"))
+    if reach:
+        _reach_clamp(xs, ys, fl, hard)
+    if _raw:
+        return xs, ys, fl, hard
+
     def f(t):
         if t <= 0: k = 0
         elif t >= (n - 1) * PDT: k = n - 1
         else: k = int(t / PDT)
+        if not fl[k]:
+            return None, None
+        return xs[k], ys[k]
+    return f
+
+
+def _raw(anchors, rep, lab, walk, dur, **kw):
+    """viewer 와 같지만 «시각->좌표» 함수 대신 프레임 배열을 그대로 준다."""
+    return viewer(anchors, rep, lab, walk, dur, _raw=True, **kw)
+
+
+def smooth(anchors, rep, lab, walk, dur, **kw):
+    """Forward-Backward — 앞으로 한 번, 뒤로 한 번 돌려 섞는다.
+
+    앞으로만 도는 시뮬은 «다음 스냅샷이 온다» 는 것을 모른다. 그래서 목적지로
+    걸어가다가 스냅샷을 만나면 그제야 끌려간다 — 스냅샷 직전 구간이 늘 뒤처진다.
+    시간을 뒤집어 한 번 더 돌리면 그 구간은 «스냅샷에서 출발» 하므로 정확하다.
+    섞는 무게는 «다음 앵커까지 남은 시간» 으로 정한다. 역방향 패스에는 이동
+    명령이 없어서(목적지는 시간을 뒤집으면 뜻이 달라진다) 앵커에서 멀어질수록
+    쓸모가 없다 — 그냥 «다음 앵커에 서 있다» 가 된다. 실제로 앵커 사이 위치로
+    섞었더니 짧은 공백은 4.68 -> 2.58 로 좋아졌지만 긴 공백이 5.4 -> 17.9 로
+    망가졌다. 그래서 앵커에 가까운 구간에서만 역방향을 믿는다.
+    """
+    xs_f, ys_f, fl_f, hard = _raw(anchors, rep, lab, walk, dur, **kw)
+    n = len(xs_f)
+    T = (n - 1) * PDT
+
+    # 시간을 뒤집은 자료로 한 번 더. 이동 명령은 «목적지» 라 뒤집으면 뜻이 달라져
+    # 넣지 않는다 — 역방향은 순수하게 «앵커에서 출발해 되짚는» 역할만 맡는다.
+    rev = [[T - p[0], p[1], p[2], p[3] if len(p) > 3 else "c"] for p in anchors]
+    rev.sort(key=lambda p: p[0])
+    kw2 = dict(kw); kw2["cmds"] = False; kw2["aims"] = False
+    xs_b, ys_b, fl_b, _ = _raw(rev, rep, lab, walk, T, **kw2)
+
+    xs, ys, fl = list(xs_f), list(ys_f), list(fl_f)
+    ht = [h[0] for h in hard]
+    for k in range(n):
+        if fl_f[k] != 1:
+            continue
+        kb = n - 1 - k                       # 역방향에서 같은 시각의 프레임
+        if kb < 0 or kb >= len(xs_b) or fl_b[kb] != 1:
+            continue
+        t = k * PDT
+        prev = max((h for h in ht if h <= t), default=None)
+        nxt = min((h for h in ht if h >= t), default=None)
+        if prev is None or nxt is None or nxt - prev <= 1e-6:
+            continue
+        # 다음 앵커까지 TAU 초 안쪽에서만 역방향을 믿는다 (선형으로 줄어든다)
+        w = max(0.0, 1.0 - (nxt - t) / TAU)
+        if w <= 0:
+            continue
+        xs[k] = xs_f[k] * (1 - w) + xs_b[kb] * w
+        ys[k] = ys_f[k] * (1 - w) + ys_b[kb] * w
+
+    def f(tq):
+        k = 0 if tq <= 0 else (n - 1 if tq >= T else int(tq / PDT))
         if not fl[k]:
             return None, None
         return xs[k], ys[k]
@@ -259,5 +363,11 @@ MODELS = {
     "-스킬조준": _variant(aims=False),
     "-지형": _variant(terrain=False),
     "-길찾기": _variant(astar=False),
+    "+도달가능": _variant(reach=True),
+    "+어택무브": _variant(amove=True),
+    "+둘다": _variant(reach=True, amove=True),
+    "+FB": lambda a, r, l, w, d: smooth(a, r, l, w, d),
+    "+FB+전부": lambda a, r, l, w, d: smooth(a, r, l, w, d, reach=True, amove=True),
+    "전부": lambda a, r, l, w, d: smooth(a, r, l, w, d, reach=True, amove=True),
     "-전부(앵커만)": _variant(cmds=False, aims=False, terrain=False),
 }

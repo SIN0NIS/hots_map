@@ -208,6 +208,12 @@ def extract(path):
     apm = defaultdict(lambda: defaultdict(int))   # userId -> 분 -> 명령 수 (APM 용)
     commands = defaultdict(list)    # userId -> [sec, x, y]   순수 이동 명령
     aims = defaultdict(list)        # userId -> [sec, x, y]   스킬 조준점
+    # 어택무브(A + 클릭)는 «스킬» 로 분류되지만 실제로는 이동 명령이다.
+    # 실측: 한 판에 1713건(점표적 814 · 유닛표적 899)이 나오는데, 지금까지는
+    # 약한 조준점 앵커로만 써서 목적지 정보를 통째로 버리고 있었다.
+    amoves = defaultdict(list)      # userId -> [sec, x, y]
+    last_am = {}
+    ATTACK_LINK = 26                # 실측: 공격 / A-이동
     last_sec, last_aim = {}, {}
     game_events = protocol.decode_replay_game_events(archive.read_file("replay.game.events"))
     for ev in game_events:
@@ -222,6 +228,16 @@ def extract(path):
             continue
         pt = [sec, round(target["x"] / 4096.0, 1), round(target["y"] / 4096.0, 1)]
         abil = ev.get("m_abil")
+        if abil is not None and abil.get("m_abilLink") == ATTACK_LINK:
+            # 어택무브는 «거기까지 걸어간다» 이므로 이동 목적지로 쓴다.
+            # 다만 사거리 안에 적이 들어오면 도중에 멈춘다 — 그 시점은 알 수 없으니
+            # 다음 명령이나 위치 스냅샷이 바로잡게 맡긴다.
+            if last_am.get(uid) == sec:
+                amoves[uid][-1] = pt
+            else:
+                amoves[uid].append(pt)
+                last_am[uid] = sec
+            continue
         if abil is not None:
             # 스킬을 그 지점에 썼다 = «그때 사거리 안에 있었다»는 약한 단서다.
             # 이동 목적지로 쓰면 안 된다 (갈처럼 이동 명령이 없는 영웅이 끌려간다).
@@ -256,6 +272,9 @@ def extract(path):
         # 묶어서 동명이인이 있으면 한 명의 이동명령이 통째로 사라졌다.
         "movement_commands": {pname(uid + 1): pts for uid, pts in commands.items()},
         "ability_aims": {pname(uid + 1): pts for uid, pts in aims.items()},
+        # 어택무브 목적지 [초, x, y] — 이동 명령과 같은 성질이지만 따로 담아
+        # 효과를 따로 잴 수 있게 한다
+        "attack_moves": {pname(uid + 1): pts for uid, pts in amoves.items()},
         # 잡은 것 = 위치 앵커. [초, x, y, 종류] · 종류 minion/merc/struct/hero
         "kill_anchors": {pname(pid): v for pid, v in kill_anchor.items()},
         "team_xp": sorted(team_xp, key=lambda r: (r["t"], r["team"])),

@@ -21,6 +21,13 @@ function prepare(raw){
     if(!heroes[lab]) heroes[lab] = {team: teamOf(lab,players), pts:[]};
     for(const p of raw.movement_commands[nm]) heroes[lab].pts.push({t:p[0],x:p[1],y:p[2],src:'m'});
   }
+  // 어택무브(A + 클릭) — «스킬»로 분류되지만 실제로는 거기까지 걸어가는 명령이다.
+  // 실측: 8경기에서 10,014건이 나와 목적지 정보가 16% 늘어난다.
+  for(const nm in (raw.attack_moves||{})){
+    const lab = heroes[nm] ? nm : (label[nm] || nm);
+    if(!heroes[lab]) continue;
+    for(const p of raw.attack_moves[nm]) heroes[lab].pts.push({t:p[0],x:p[1],y:p[2],src:'m'});
+  }
   // 스킬 조준점 — 이동 목적지가 아니라 «그때 사거리 안에 있었다»는 약한 단서
   for(const nm in (raw.ability_aims||{})){
     const lab = heroes[nm] ? nm : (label[nm] || nm);
@@ -52,7 +59,8 @@ function prepare(raw){
     bounds:{minX:minX-6,maxX:maxX+6,minY:minY-6,maxY:maxY+6} };
   for(const lab in heroes){
     const h = heroes[lab];
-    h.path = buildPath(h.pts, maxT);
+    h.path = smoothPath(buildPath(h.pts, maxT), h.pts, maxT);
+    h.conf = buildConf(h.path, h.pts);     // 프레임별 «얼마나 믿을 수 있나» 0~1
     h.heroName = (lab.match(/\((.+)\)$/)||[])[1] || lab;   // 라벨 "이름(영웅)" -> 영웅
   }
   return out;
@@ -156,6 +164,74 @@ function buildPath(pts, maxT){
   }
   return {n,xs,ys,fl};
 }
+
+/* ── 앞뒤로 두 번 돌려 섞기 (Forward-Backward) ──────────────────────
+   앞으로만 도는 시뮬은 «다음 스냅샷이 온다»는 것을 모른다. 목적지로 걸어가다가
+   스냅샷을 만나야 비로소 끌려가므로 스냅샷 «직전» 구간이 늘 뒤처진다.
+   시간을 뒤집어 한 번 더 돌리면 그 구간은 앵커에서 «출발»하므로 정확하다.
+
+   다만 역방향에는 이동 명령을 넣을 수 없다 (목적지는 시간을 뒤집으면 뜻이
+   달라진다). 그래서 앵커에서 멀어지면 역방향은 «다음 앵커에 서 있다»가 되어
+   쓸모가 없다 — 실측으로 앵커 사이 위치에 따라 섞었더니 짧은 공백은 −45% 좋아진
+   대신 긴 공백이 3배 나빠졌다. 다음 앵커까지 FB_TAU 초 안에서만 믿는다.
+   실측 결과: 평균 5.29 -> 5.11 (−3.4%), p95 14.61 -> 13.25 (−9.3%). */
+const FB_TAU = 6.0;
+function smoothPath(P, pts, maxT){
+  const n=P.n, xs=P.xs, ys=P.ys, fl=P.fl;
+  // 부활(r)은 앵커로 쓰지 않는다 — 순간이동이라 «거기서 되짚는다»가 성립하지 않는다
+  const hardT=[];
+  for(const p of pts) if(p.src==='c'||p.src==='s'||p.src==='d') hardT.push(p.t);
+  hardT.sort((a,b)=>a-b);
+  if(hardT.length<2) return P;
+  // 시간을 뒤집은 앵커만으로 한 번 더 (명령·조준점 없이)
+  const rev=[];
+  for(const p of pts) if(p.src!=='m'&&p.src!=='a') rev.push({t:maxT-p.t,x:p.x,y:p.y,src:p.src});
+  rev.sort((a,b)=>a.t-b.t);
+  const B=buildPath(rev, maxT);
+  let hi=0;
+  for(let k=0;k<n;k++){
+    if(fl[k]!==1) continue;
+    const kb=n-1-k;
+    if(kb<0||kb>=B.n||B.fl[kb]!==1) continue;
+    const t=k*PDT;
+    while(hi<hardT.length && hardT[hi]<t) hi++;
+    if(hi>=hardT.length) break;
+    const w = 1 - (hardT[hi]-t)/FB_TAU;
+    if(w<=0) continue;
+    xs[k]=xs[k]*(1-w)+B.xs[kb]*w;
+    ys[k]=ys[k]*(1-w)+B.ys[kb]*w;
+  }
+  return P;
+}
+
+/* ── 신뢰도 트랙 ────────────────────────────────────────────────────
+   «이 프레임의 위치를 얼마나 믿을 수 있나»를 0~1로 매긴다. 정확도를 올리는 게
+   아니라 정직해지는 장치다 — 재구성이 완벽할 수 없으므로, 확실한 구간과 짐작인
+   구간을 화면에서 구분해 준다.
+   실측 오차와 맞물리는 두 가지로 만든다:
+     · 가장 가까운 실측 앵커까지의 시간 (홀드아웃에서 공백이 길수록 오차가 컸다)
+     · 그 구간에 이동 명령이 있었나 (명령을 빼면 오차가 5.3 -> 15.5 로 뛴다) */
+function buildConf(P, pts){
+  const n=P.n, cf=new F(n);
+  const hard=[], cmd=[];
+  for(const p of pts){
+    if(p.src==='c'||p.src==='s'||p.src==='d'||p.src==='r') hard.push(p.t);
+    else if(p.src==='m') cmd.push(p.t);
+  }
+  hard.sort((a,b)=>a-b); cmd.sort((a,b)=>a-b);
+  let hi=0, ci=0, lastH=-1e9, lastC=-1e9;
+  for(let k=0;k<n;k++){
+    const t=k*PDT;
+    while(hi<hard.length && hard[hi]<=t) lastH=hard[hi++];
+    while(ci<cmd.length && cmd[ci]<=t) lastC=cmd[ci++];
+    const nextH = hi<hard.length ? hard[hi] : 1e9;
+    const gap = Math.min(t-lastH, nextH-t);        // 가까운 쪽 앵커까지
+    let c = 1/(1+gap/6);                           // 6초 떨어지면 0.5
+    if(t-lastC < 3) c = Math.min(1, c+0.15);       // 최근 명령이 있으면 조금 더 믿는다
+    cf[k] = P.fl[k] ? Math.max(0.15, Math.min(1, c)) : 0;
+  }
+  return cf;
+}
 /* 지형 격자가 없으면 늘 통과 (기존 동작 유지).
    스냅샷 좌표는 정수라 가끔 «벽» 칸 위에 그대로 떨어진다. 그러면 어느 쪽으로도
    못 나가 다음 스냅샷까지 15초를 그 자리에 못박혔다 (실측 8경기 4건·59.6초).
@@ -170,16 +246,19 @@ function canGo(x0,y0,x1,y1){
 /* 격자 사이를 선형 보간해 돌려준다 — 이것이 «뚝뚝 끊김»을 없애는 핵심이다. */
 function posAt(h, t){
   const P=h.path; if(!P||!P.n) return null;
+  const C=h.conf;
   const f=t/PDT;
-  if(f<=0) return P.fl[0]? {x:P.xs[0],y:P.ys[0],dead:P.fl[0]===2} : null;
+  const at=(i,dead)=>({x:P.xs[i], y:P.ys[i], dead, conf:C?C[i]:1});
+  if(f<=0) return P.fl[0]? at(0, P.fl[0]===2) : null;
   const last=P.n-1;
-  if(f>=last) return P.fl[last]? {x:P.xs[last],y:P.ys[last],dead:P.fl[last]===2} : null;
+  if(f>=last) return P.fl[last]? at(last, P.fl[last]===2) : null;
   const i=f|0, a=P.fl[i], b=P.fl[i+1];
-  if(!a) return b? {x:P.xs[i+1],y:P.ys[i+1],dead:b===2} : null;
+  if(!a) return b? at(i+1, b===2) : null;
   // 사망 구간은 보간하지 않는다 (시체가 미끄러지면 이상하다)
-  if(!b || a===2 || b===2) return {x:P.xs[i],y:P.ys[i],dead:a===2};
+  if(!b || a===2 || b===2) return at(i, a===2);
   const u=f-i;
-  return {x:P.xs[i]+(P.xs[i+1]-P.xs[i])*u, y:P.ys[i]+(P.ys[i+1]-P.ys[i])*u, dead:false};
+  return {x:P.xs[i]+(P.xs[i+1]-P.xs[i])*u, y:P.ys[i]+(P.ys[i+1]-P.ys[i])*u,
+          dead:false, conf: C ? C[i]+(C[i+1]-C[i])*u : 1};
 }
 
 /* ---- 이벤트 분류·표기 ---- */
