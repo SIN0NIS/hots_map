@@ -100,6 +100,103 @@ class Walk:
         return True
 
 
+    # ── 길찾기 (js/pathing.js 의 이식) ────────────────────────────
+    def nearest_walkable(self, x, y, max_r):
+        """그 자리가 벽이면 가장 가까운 통행 칸으로 옮긴다."""
+        if self.walkable(x, y):
+            return x, y
+        for r in range(1, int(max_r) + 1):
+            best, bd = None, 1e18
+            for dy in range(-r, r + 1):
+                for dx in range(-r, r + 1):
+                    if max(abs(dx), abs(dy)) != r:
+                        continue
+                    nx, ny = int(x) + dx, int(y) + dy
+                    if self.walkable(nx + 0.5, ny + 0.5):
+                        d = dx * dx + dy * dy
+                        if d < bd:
+                            bd, best = d, (nx + 0.5, ny + 0.5)
+            if best:
+                return best
+        return None
+
+    def find_path(self, sx, sy, tx, ty, cap=9000):
+        """8방향 A*. 옥타일 거리 휴리스틱. 뷰어와 같은 상한(9000칸)을 쓴다."""
+        import heapq
+        if self.grid is None:
+            return None
+        W, H = self.W, self.H
+        s = self.nearest_walkable(sx, sy, 6)
+        t = self.nearest_walkable(tx, ty, 14)
+        if not s or not t:
+            return None
+        si = int(s[1]) * W + int(s[0])
+        ti = int(t[1]) * W + int(t[0])
+        if si == ti:
+            return None
+        tX, tY = ti % W, ti // W
+        SQ2 = 2 ** 0.5
+        DIRS = ((1,0,1.0),(-1,0,1.0),(0,1,1.0),(0,-1,1.0),
+                (1,1,SQ2),(1,-1,SQ2),(-1,1,SQ2),(-1,-1,SQ2))
+        g = {si: 0.0}
+        prev = {}
+        seen = set()
+        def h(i):
+            dx, dy = abs(i % W - tX), abs(i // W - tY)
+            return (dx + dy) + (SQ2 - 2) * min(dx, dy)
+        hq = [(h(si), si)]
+        found = False
+        steps = 0
+        gw = self.grid
+        while hq and steps < cap:
+            steps += 1
+            _, cur = heapq.heappop(hq)
+            if cur == ti:
+                found = True; break
+            if cur in seen:
+                continue
+            seen.add(cur)
+            cx, cy = cur % W, cur // W
+            for dx, dy, w in DIRS:
+                nx, ny = cx + dx, cy + dy
+                if nx < 0 or ny < 0 or nx >= W or ny >= H:
+                    continue
+                ni = ny * W + nx
+                if ni in seen or gw[ni] != 1:
+                    continue
+                # 대각선은 양옆이 다 뚫려 있을 때만 (벽 모서리를 뚫지 않게)
+                if dx and dy and (gw[cy * W + cx + dx] != 1 or gw[(cy + dy) * W + cx] != 1):
+                    continue
+                ng = g[cur] + w
+                if ng < g.get(ni, 1e18):
+                    g[ni] = ng; prev[ni] = cur
+                    heapq.heappush(hq, (ng + h(ni), ni))
+        if not found:
+            return None
+        out = []
+        i = ti
+        while i != si:
+            out.append((i % W + 0.5, i // W + 0.5))
+            i = prev.get(i, si)
+            if len(out) > W * H:
+                return None
+        out.reverse()
+        return self._simplify(out)
+
+    def _simplify(self, pts, look=24):
+        """직선으로 갈 수 있는 구간은 뭉갠다 (칸 단위 지그재그 제거)."""
+        if len(pts) < 3:
+            return pts
+        out = [pts[0]]
+        i = 0
+        while i < len(pts) - 1:
+            j = min(len(pts) - 1, i + look)
+            while j > i + 1 and not self.clear_line(pts[i][0], pts[i][1], pts[j][0], pts[j][1]):
+                j -= 1
+            out.append(pts[j]); i = j
+        return out
+
+
 def walk_for(replay):
     m = match_map(replay.get("map"))
     if not m:

@@ -15,6 +15,18 @@ SNAP_DIST = 10.0   # 이보다 멀면 부드럽게 끌지 않고 바로 옮긴�
 CORR = 0.25        # 스냅샷 쪽으로 수렴하는 비율
 AIM_R = 7.0        # 스킬 조준점에서 이 거리 안에 있었다고 본다
 
+# 무언가를 잡았을 때 «그 자리에서 이만큼 안에 있었다» 고 보는 거리 (타일).
+# 자동공격 사거리보다 넉넉히 잡는다 — 스킬로도 막타를 치고, 장판·지속피해로
+# 잡으면 이미 물러난 뒤일 수 있다. 좁게 잡으면 틀린 곳으로 끌어당긴다.
+# 값은 짐작이 아니라 실측이다 — 막타 시각이 실측 스냅샷과 겹치는 표본에서
+# «영웅과 막타 지점의 실제 거리» 를 재어 뽑았다:
+#     근접  중앙 3.2 · p90 5.1 · 최대 5.4   -> 5.0 이면 거의 다 담는다
+#     원거리 중앙 5.0 · p90 25.7 · 최대 27.1 -> 꼬리가 너무 길어 쓸 값이 없다
+# 원거리는 스킬·소환물·지속피해로도 막타가 잡혀 20타일 밖에서도 «잡았다» 가 된다.
+KILL_R = {"minion": 5.0, "merc": 5.0, "struct": 6.0, "hero": 6.0}
+MELEE_ROLES = {"전사", "투사", "근접 암살자"}
+MELEE_ONLY = True   # 원거리는 제약이 못 되므로 근접에만 건다
+
 
 # ── 1. 선형 보간 (지시서 2번의 기준선) ───────────────────────────────
 def linear(anchors, rep, lab, walk, dur):
@@ -61,25 +73,55 @@ def hold(anchors, rep, lab, walk, dur):
 
 
 # ── 3. 지금 뷰어가 쓰는 모델 (js/engine.js buildPath 의 이식) ────────
-def _merge(anchors, rep, lab):
-    """앵커에 이동 명령(m)과 스킬 조준점(a)을 시간순으로 섞는다."""
+import json, re, pathlib
+
+_ROLE = None
+
+def hero_role(rep, lab):
+    """이 라벨("닉네임(영웅)")의 영웅 역할군. 근접/원거리로 사거리를 가르는 데 쓴다."""
+    global _ROLE
+    if _ROLE is None:
+        src = (pathlib.Path(__file__).resolve().parent.parent
+               / "js" / "data_heroes.js").read_text(encoding="utf-8")
+        body = src[src.index("HERO_DB"):]
+        body = body[body.index("["): body.index("];") + 1]   # 배열의 «끝» 에서 자른다
+        body = re.sub(r"(\w+):", r'"\1":', body)             # {ko:"x"} -> {"ko":"x"}
+        body = re.sub(r",\s*([\]}])", r"\1", body)
+        _ROLE = {h["ko"]: h.get("role", "") for h in json.loads(body)}
+    m = re.search(r"\(([^)]+)\)$", lab)
+    return _ROLE.get(m.group(1), "") if m else ""
+
+
+def _merge(anchors, rep, lab, use_kills=(), cmds=True, aims=True):
+    """앵커에 이동 명령(m)·스킬 조준점(a)·잡은 것(k)을 시간순으로 섞는다."""
     pts = [{"t": p[0], "x": p[1], "y": p[2],
             "src": p[3] if len(p) > 3 else "c"} for p in anchors]
-    for t, x, y in (rep.get("movement_commands") or {}).get(lab, []):
-        pts.append({"t": t, "x": x, "y": y, "src": "m"})
-    for a in (rep.get("ability_aims") or {}).get(lab, []):
-        pts.append({"t": a[0], "x": a[1], "y": a[2], "src": "a"})
+    if cmds:
+        for t, x, y in (rep.get("movement_commands") or {}).get(lab, []):
+            pts.append({"t": t, "x": x, "y": y, "src": "m"})
+    if aims:
+        for a in (rep.get("ability_aims") or {}).get(lab, []):
+            pts.append({"t": a[0], "x": a[1], "y": a[2], "src": "a"})
+    if use_kills:
+        melee = hero_role(rep, lab) in MELEE_ROLES
+        if melee or not MELEE_ONLY:
+            for k in (rep.get("kill_anchors") or {}).get(lab, []):
+                if k[3] not in use_kills:
+                    continue
+                pts.append({"t": k[0], "x": k[1], "y": k[2], "src": "k",
+                            "r": KILL_R.get(k[3], 5.0)})
     pts.sort(key=lambda p: p["t"])
     return pts
 
 
-def viewer(anchors, rep, lab, walk, dur):
-    """스냅샷 우선 + 이동 명령 + 지형 충돌. 길찾기는 «직선이 막히면 포기» 로 단순화했다.
+PATH_MIN_DIST = 14.0   # 이보다 가까우면 길찾기를 하지 않는다 (뷰어와 같은 값)
 
-    뷰어의 A* 까지 그대로 옮기면 평가가 매우 느려진다. 여기서는 벽에 막히면
-    그 명령을 버리는 것으로 대신하고, 길찾기의 기여도는 따로 재기로 한다.
-    """
-    pts = _merge(anchors, rep, lab)
+def viewer(anchors, rep, lab, walk, dur, use_kills=(), cmds=True, aims=True,
+           terrain=True, astar=True):
+    """스냅샷 우선 + 이동 명령 + 지형 충돌 + A* 길찾기 (js/engine.js buildPath 이식)."""
+    pts = _merge(anchors, rep, lab, use_kills, cmds, aims)
+    if not terrain:
+        walk = None
     n = int((dur + PDT) / PDT) + 1
     xs = [0.0] * n; ys = [0.0] * n; fl = [0] * n
 
@@ -93,6 +135,7 @@ def viewer(anchors, rep, lab, walk, dur):
 
     cx = cy = 0.0; has = False
     tx = ty = 0.0; has_t = False
+    route = None; ri = 0
     sx = sy = 0.0; has_s = False; s_age = 0
     dead = False; last_fix = -1.0; i = 0
 
@@ -107,12 +150,16 @@ def viewer(anchors, rep, lab, walk, dur):
             s = p["src"]
             if s == "m":
                 tx, ty, has_t, has_s = p["x"], p["y"], True, False
-            elif s == "a":
+                route = None; ri = 0
+            elif s in ("a", "k"):
+                # 조준점·막타 지점 — «그 자리에서 R 안» 이므로, 그보다 멀면 R 까지 당긴다.
+                # 같은 시각에 실측 스냅샷이 있었으면 그쪽이 사실이므로 건드리지 않는다.
+                R = AIM_R if s == "a" else p.get("r", 6.0)
                 if has and not dead and p["t"] != last_fix:
                     dx, dy = p["x"] - cx, p["y"] - cy
                     d = math.hypot(dx, dy)
-                    if d > AIM_R:
-                        f = (d - AIM_R) / d
+                    if d > R:
+                        f = (d - R) / d
                         nx, ny = cx + dx * f, cy + dy * f
                         if can_go(cx, cy, nx, ny):
                             cx, cy = nx, ny
@@ -139,19 +186,51 @@ def viewer(anchors, rep, lab, walk, dur):
                     if s_age >= 15:      # 당기는 힘과 미는 힘이 맞서 교착되는 것을 끊는다
                         has_s = False
             if has_t:
+                # 목적지가 벽 건너편이면 한 번만 길을 찾아 두고 그 경로를 따라간다
+                if (astar and walk and route is None
+                        and math.hypot(tx - cx, ty - cy) >= PATH_MIN_DIST
+                        and not walk.clear_line(cx, cy, tx, ty)):
+                    route = walk.find_path(cx, cy, tx, ty) or False
+                    ri = 0
                 step = SPEED * PDT
-                dx, dy = tx - cx, ty - cy
-                d = math.hypot(dx, dy)
-                if d <= step:
-                    if can_go(cx, cy, tx, ty):
-                        cx, cy = tx, ty
-                    has_t = False
-                else:
-                    nx, ny = cx + dx / d * step, cy + dy / d * step
-                    if can_go(cx, cy, nx, ny):
-                        cx, cy = nx, ny
+                retry = 2
+                while step > 1e-6:
+                    wp = route[ri] if (route and ri < len(route)) else (tx, ty)
+                    dx, dy = wp[0] - cx, wp[1] - cy
+                    d = math.hypot(dx, dy)
+                    if d <= step:
+                        if can_go(cx, cy, wp[0], wp[1]):
+                            cx, cy = wp[0], wp[1]
+                        elif retry > 0 and astar and walk:
+                            retry -= 1
+                            route = walk.find_path(cx, cy, tx, ty) or False
+                            ri = 0
+                            if route:
+                                continue
+                            has_t = False; break
+                        else:
+                            has_t = False; route = None; break
+                        step -= d
+                        if route and ri < len(route):
+                            ri += 1
+                            if ri >= len(route):
+                                route = None; has_t = False; break
+                        else:
+                            has_t = False; break
                     else:
-                        has_t = False        # 벽에 막히면 명령을 버린다
+                        nx, ny = cx + dx / d * step, cy + dy / d * step
+                        if can_go(cx, cy, nx, ny):
+                            cx, cy = nx, ny
+                        elif retry > 0 and astar and walk:
+                            retry -= 1
+                            route = walk.find_path(cx, cy, tx, ty) or False
+                            ri = 0
+                            if route:
+                                continue
+                            has_t = False
+                        else:
+                            has_t = False; route = None
+                        break
         xs[k], ys[k], fl[k] = cx, cy, (2 if dead else (1 if has else 0))
 
     def f(t):
@@ -164,4 +243,21 @@ def viewer(anchors, rep, lab, walk, dur):
     return f
 
 
-MODELS = {"hold": hold, "linear": linear, "viewer": viewer}
+def _variant(**kw):
+    """어블레이션 — 제약을 하나씩 끄거나 켜서 각각의 기여도를 잰다."""
+    def f(anchors, rep, lab, walk, dur):
+        return viewer(anchors, rep, lab, walk, dur, **kw)
+    return f
+
+
+MODELS = {
+    "hold": hold,
+    "linear": linear,
+    "viewer": viewer,                                   # 지금 뷰어 (막타 앵커 없음)
+    "+kill(근접)": _variant(use_kills={"minion", "merc", "struct", "hero"}),
+    "-이동명령": _variant(cmds=False),
+    "-스킬조준": _variant(aims=False),
+    "-지형": _variant(terrain=False),
+    "-길찾기": _variant(astar=False),
+    "-전부(앵커만)": _variant(cmds=False, aims=False, terrain=False),
+}

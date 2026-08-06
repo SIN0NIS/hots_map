@@ -20,6 +20,25 @@ SKIP_STAT = {"RegenGlobePickedUp", "PeriodicXPBreakdown", "PlayerInit",
 def ds(v):
     return v.decode("utf-8", errors="replace") if isinstance(v, bytes) else v
 
+
+# 잡은 대상의 종류. 앵커의 신뢰도가 종류마다 다르다 —
+# 미니언·용병은 «싸워서» 잡으므로 가까이 있었고, 구조물도 마찬가지다.
+# 포탈·배너 같은 것은 상호작용 거리가 제각각이라 뺀다.
+def kill_kind(uname):
+    u = uname or ""
+    if u.startswith("Hero"):
+        return "hero"
+    if any(k in u for k in ("Minion", "Footman", "Wizard", "Ranged", "Melee",
+                            "Catapult", "Siege", "Laner")):
+        return "minion"
+    if any(k in u for k in ("Merc", "Camp", "Golem", "Bruiser", "Knight",
+                            "Slime", "Boss", "Giant", "Sapper")):
+        return "merc"
+    if any(k in u for k in ("TownHall", "CannonTower", "Core", "King",
+                            "Moonwell", "WallRadial", "GateL")):
+        return "struct"
+    return ""
+
 BUNDLED_BUILD = 91756          # py/protocol91756.py 가 만들어진 빌드
 
 def extract(path):
@@ -50,6 +69,11 @@ def extract(path):
     tag_index_info = {}
     tracks = defaultdict(list)     # pid -> [sec, x, y, src]
     structures = []                # 게임 시작 시 구조물 좌표 (SVG 정렬용)
+    # «무엇을 언제 어디서 잡았나» — 영웅 위치를 좁히는 앵커다.
+    # SUnitDiedEvent 는 죽은 유닛의 «정확한 좌표»와 «막타 친 플레이어»를 같이 남긴다.
+    # 그래서 미니언 궤적을 따로 복원할 필요가 전혀 없다 — 죽은 자리가 곧 관측점이다.
+    # 잡은 영웅은 그 순간 그 자리에서 사거리 안에 있었다.
+    kill_anchor = defaultdict(list)   # pid -> [초, x, y, 종류]
     team_xp = []                   # 팀별 레벨·경험치 시계열 (그래프용)
 
     # 플레이어의 «본체» 영웅 유닛만 추적한다.
@@ -117,7 +141,15 @@ def extract(path):
             pid = hero_idx.get(idx)
             if pid:
                 tracks[pid].append([sec, ev["m_x"], ev["m_y"], "d"])
-            elif not uname.startswith("Hero") and ("Town" in uname or "Core" in uname):
+
+            # 막타를 친 영웅에게 «그때 그 자리 사거리 안» 이라는 앵커를 준다
+            kp = ev.get("m_killerPlayerId")
+            if kp and 1 <= kp <= 10 and ev["m_x"] is not None:
+                kind = kill_kind(uname)
+                if kind:
+                    kill_anchor[kp].append([sec, ev["m_x"], ev["m_y"], kind])
+
+            if not uname.startswith("Hero") and ("Town" in uname or "Core" in uname):
                 timeline.append({"t": sec, "e": "structure_died", "unit": uname,
                                  "x": ev["m_x"], "y": ev["m_y"]})
 
@@ -224,6 +256,8 @@ def extract(path):
         # 묶어서 동명이인이 있으면 한 명의 이동명령이 통째로 사라졌다.
         "movement_commands": {pname(uid + 1): pts for uid, pts in commands.items()},
         "ability_aims": {pname(uid + 1): pts for uid, pts in aims.items()},
+        # 잡은 것 = 위치 앵커. [초, x, y, 종류] · 종류 minion/merc/struct/hero
+        "kill_anchors": {pname(pid): v for pid, v in kill_anchor.items()},
         "team_xp": sorted(team_xp, key=lambda r: (r["t"], r["team"])),
         # 분 단위 명령 수 (APM). {"이름(영웅)": {"0": 42, "1": 55, ...}}
         "apm": {pname(uid + 1): {str(m): n for m, n in sorted(b.items())}
