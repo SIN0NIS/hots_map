@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>히오스 전장 기록 재생기 + 전술 보드</title>
-<link rel="stylesheet" href="css/style.css?v=31">
+<link rel="stylesheet" href="css/style.css?v=32">
 </head>
 <body class="mode-map">
 <nav id="modebar" class="frame">
@@ -97,6 +97,7 @@
             <button class="teamb" data-t="red">🔴 RED</button>
           </div>
           <input id="hsearch" type="search" placeholder="영웅 검색 (한/영)" style="display:none" autocomplete="off">
+          <div id="roles" style="display:none"></div>
           <div id="heroes" style="display:none"></div>
           <span id="szwrap" style="display:none"><input type="range" id="sz" min="2" max="40" value="5"><span id="szv"></span></span>
           <span id="hint"></span>
@@ -121,6 +122,7 @@
       </span>
       <span class="cl">투명도</span> <input type="range" id="bgAlpha" min="0" max="100" value="70" style="width:80px">
       <span class="cl" id="heroSzWrap">영웅 크기 <input type="range" id="heroSz" min="12" max="52" step="1" value="27" style="width:72px" title="지도 위 영웅 아이콘 크기"></span>
+      <span class="cl">글씨 <input type="range" id="uiFs" min="90" max="150" step="5" value="110" style="width:72px" title="화면 글씨 크기 (%)"><b id="uiFsV">110%</b></span>
       <span class="cl" id="calHint">🖌 도구를 켜면 맵 위에 그리기·핀·토큰 배치 가능</span>
     </div>
     </div>
@@ -192,24 +194,24 @@
     <div id="lvTable"></div>
   </div>
 </div>
-<script src="js/data_maps.js?v=31"></script>
-  <script src="js/data_levels.js?v=31"></script>
-<script src="js/data_heroes.js?v=31"></script>
-<script src="js/data_talents.js?v=31"></script>
-<script src="js/data_samples.js?v=31"></script>
-<script src="js/data_pathing.js?v=31"></script>
-<script src="js/demo_replay.js?v=31"></script>
-<script src="js/py_bundle.js?v=31"></script>
-<script src="js/pathing.js?v=31"></script>
-<script src="js/engine.js?v=31"></script>
-<script src="js/render.js?v=31"></script>
-<script src="js/log.js?v=31"></script>
-<script src="js/teambar.js?v=31"></script>
-<script src="js/timeline.js?v=31"></script>
-<script src="js/panzoom.js?v=31"></script>
-<script src="js/tools.js?v=31"></script>
-<script src="js/maps.js?v=31"></script>
-<script src="js/parser.js?v=31"></script>
-<script src="js/main.js?v=31"></script>
+<script src="js/data_maps.js?v=32"></script>
+  <script src="js/data_levels.js?v=32"></script>
+<script src="js/data_heroes.js?v=32"></script>
+<script src="js/data_talents.js?v=32"></script>
+<script src="js/data_samples.js?v=32"></script>
+<script src="js/data_pathing.js?v=32"></script>
+<script src="js/demo_replay.js?v=32"></script>
+<script src="js/py_bundle.js?v=32"></script>
+<script src="js/pathing.js?v=32"></script>
+<script src="js/engine.js?v=32"></script>
+<script src="js/render.js?v=32"></script>
+<script src="js/log.js?v=32"></script>
+<script src="js/teambar.js?v=32"></script>
+<script src="js/timeline.js?v=32"></script>
+<script src="js/panzoom.js?v=32"></script>
+<script src="js/tools.js?v=32"></script>
+<script src="js/maps.js?v=32"></script>
+<script src="js/parser.js?v=32"></script>
+<script src="js/main.js?v=32"></script>
 </body>
 </html>

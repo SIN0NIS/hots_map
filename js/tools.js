@@ -85,16 +85,42 @@ document.querySelectorAll('.teamb').forEach(b=>b.onclick=()=>{
 
 /* --- 영웅 팔레트: 내장 90명 + 직접 등록 --- */
 const heroesEl=document.getElementById('heroes');
+const rolesEl=document.getElementById('roles');
 const herofile=document.getElementById('herofile');
 const hsearch=document.getElementById('hsearch');
 const BUILTIN_HEROES = HERO_DB.slice()
   .sort((a,b)=>a.ko.localeCompare(b.ko,'ko'))
-  .map(h=>({name:h.ko, en:h.en, src:'icons/'+h.icon}));
+  .map(h=>({name:h.ko, en:h.en, role:h.role||'', src:'icons/'+h.icon}));
+/* 역할군 고르기 — 90명을 한 줄로 늘어놓으면 찾기 어렵다.
+   역할은 게임 데이터의 expandedRole 을 그대로 쓴다 (tools/build_roles.py). */
+let roleSel='';                                   // '' = 전체
+const ROLE_ICON={'전사':'🛡','투사':'⚔','치유사':'✚','지원가':'✦',
+                 '근접 암살자':'🗡','원거리 암살자':'🏹','직접 등록':'＋'};
+function renderRoles(){
+  rolesEl.replaceChildren();
+  const counts={}; for(const h of BUILTIN_HEROES) counts[h.role]=(counts[h.role]||0)+1;
+  const mk=(key,label,n)=>{
+    const b=document.createElement('button');
+    b.className='rb'+(roleSel===key?' on':'');
+    b.innerHTML=`<i>${ROLE_ICON[key]||'✷'}</i>${label}<em>${n}</em>`;
+    b.title=key||'전체';
+    b.onclick=()=>{ roleSel = roleSel===key ? '' : key; renderRoles(); renderHeroes(); };
+    rolesEl.appendChild(b);
+  };
+  const all=document.createElement('button');
+  all.className='rb'+(roleSel===''?' on':'');
+  all.innerHTML=`<i>✷</i>전체<em>${BUILTIN_HEROES.length+customIcons.length}</em>`;
+  all.onclick=()=>{ roleSel=''; renderRoles(); renderHeroes(); };
+  rolesEl.appendChild(all);
+  for(const r of (typeof HERO_ROLES!=='undefined'?HERO_ROLES:[]))
+    if(counts[r]) mk(r, r.replace(' 암살자','암'), counts[r]);
+  if(customIcons.length) mk('직접 등록','직접', customIcons.length);
+}
 const customIcons=[];
 function heroBtn(h){
   const b=document.createElement('button');
   b.className='hb'+(heroSel&&heroSel.src===h.src?' on':'');
-  b.title=h.en? h.name+' ('+h.en+')' : h.name;
+  b.title=(h.en? h.name+' ('+h.en+')' : h.name) + (h.role? ' · '+h.role : '');
   const im=document.createElement('img');
   im.src=h.src; im.alt=h.name; im.loading='lazy'; im.draggable=false;
   b.appendChild(im);
@@ -109,13 +135,19 @@ function renderHeroes(){
   b0.textContent='●'; b0.title='기본 (색 핀 / 번호 토큰)';
   b0.onclick=()=>{ heroSel=null; renderHeroes(); applyToSel('hero', null); };
   heroesEl.appendChild(b0);
-  for(const h of BUILTIN_HEROES){
-    if(q && !heroNorm(h.name).includes(q) && !heroNorm(h.en).includes(q)) continue;
-    heroesEl.appendChild(heroBtn(h));
-  }
-  for(const h of customIcons){
-    if(q && !heroNorm(h.name).includes(q)) continue;
-    heroesEl.appendChild(heroBtn(h));
+  let n=0;
+  const pass=h=>{
+    if(q) return heroNorm(h.name).includes(q) || heroNorm(h.en||'').includes(q);
+    return !roleSel || h.role===roleSel;          // 찾는 중에는 역할군을 무시한다
+  };
+  for(const h of BUILTIN_HEROES) if(pass(h)){ heroesEl.appendChild(heroBtn(h)); n++; }
+  for(const h of customIcons)
+    if(q ? heroNorm(h.name).includes(q) : (!roleSel || roleSel==='직접 등록')){
+      heroesEl.appendChild(heroBtn(h)); n++; }
+  if(!n){
+    const e=document.createElement('span'); e.className='hnone';
+    e.textContent = q ? '찾는 영웅이 없습니다' : '이 역할군에 등록된 영웅이 없습니다';
+    heroesEl.appendChild(e);
   }
   const ba=document.createElement('button');
   ba.className='hb'; ba.textContent='＋'; ba.title='아이콘 직접 등록 (여러 장 가능)';
@@ -136,6 +168,7 @@ herofile.onchange=()=>{
   });
   herofile.value='';
 };
+renderRoles();
 renderHeroes();
 
 /* --- 크기 슬라이더 --- */
@@ -210,6 +243,7 @@ function refreshPanel(){
   teamRow.style.display  = showTeam ?'flex':'none';
   heroesEl.style.display = showHero?'flex':'none';
   hsearch.style.display  = showHero?'block':'none';
+  rolesEl.style.display  = showHero?'flex':'none';
   szwrap.style.display   = showSize?'flex':'none';
   document.getElementById('hint').textContent =
     o ? SEL_HINT(o) : HINTS[mode];

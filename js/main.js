@@ -134,6 +134,20 @@ function applyHeroSize(v){
 }
 heroSzEl.oninput=e=>applyHeroSize(+e.target.value);
 heroSzEl.value=HERO_R;
+
+/* 화면 글씨 크기 — css/style.css 의 모든 font-size 에 곱해지는 배율.
+   px 로 적힌 스타일시트라 rem 으로는 한 번에 못 키운다. 값은 기억해 둔다. */
+const uiFs=document.getElementById('uiFs'), uiFsV=document.getElementById('uiFsV');
+function applyFs(pct){
+  const v=Math.max(90, Math.min(150, +pct||110));
+  document.documentElement.style.setProperty('--fs', (v/100).toFixed(2));
+  uiFs.value=v; uiFsV.textContent=v+'%';
+  try{ localStorage.setItem('hots_ui_fs', v); }catch(_){}
+  // 캔버스 글씨(그래프 눈금)와 창 크기 계산도 같이 다시
+  requestAnimationFrame(()=>{ resizeOverlay(); if(typeof drawXp==='function') drawXp(); });
+}
+uiFs.oninput=e=>applyFs(e.target.value);
+applyFs((()=>{ try{ return localStorage.getItem('hots_ui_fs')||110; }catch(_){ return 110; } })());
 document.getElementById('showStruct').onchange=e=>{ showStruct=e.target.checked; markDirty(); };
 document.getElementById('heroIconTgl').onchange=e=>{ showHeroIcons=e.target.checked; markDirty(); };
 

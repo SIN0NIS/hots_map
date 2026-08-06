@@ -66,6 +66,10 @@ Heroes of the Storm **리플레이(.StormReplay)를 브라우저에서 바로 �
   영웅 아이콘 핀/토큰을 배치할 수 있다. 영웅 검색(한/영), 팀 색(청/적),
   크기 조절, 끌어서 이동, 🗑로 삭제, `Ctrl+Z` 되돌리기.
   놓인 것을 누르면 금색으로 강조되고, 맨땅을 누르면 강조가 풀린다.
+- **영웅 고르기** — 90명이라 한 줄로 늘어놓으면 찾기 어렵다. 위의 역할군 칩으로 추린다:
+  🛡전사 13 · ⚔투사 17 · ✚치유사 16 · ✦지원가 4 · 🗡근접 암살자 10 · 🏹원거리 암살자 30.
+  (역할은 게임 데이터의 `expandedRole` 을 그대로 쓴다 — `tools/build_roles.py`)
+  검색창에 한글·영문을 치면 역할군과 상관없이 전체에서 찾는다.
 - **놓은 뒤에도 바꾼다** — 말이나 핀을 고르면 그 자리에서 팔레트가 열린다.
   색·팀·초상화·크기를 눌러 바로 갈아 끼울 수 있고, ● 를 누르면 초상화를 떼고
   기본 색 핀/번호 말로 돌아간다. 바꾼 것은 `Ctrl+Z` 로 하나씩 되돌아간다.
@@ -80,6 +84,7 @@ Heroes of the Storm **리플레이(.StormReplay)를 브라우저에서 바로 �
 - **영웅 표시 크기** — 화면 아래 「영웅 크기」 손잡이.
   리플레이에서는 지도를 확대해도 초상화 크기가 화면상 그대로 유지되고,
   맵 보기에서는 보드에 놓인 영웅 말 크기를 바꾼다.
+- **글씨 크기** — 화면 아래 「글씨」 손잡이로 90~150% 까지. 다음에 열 때도 기억한다.
 
 ## 바로 쓰기
 
@@ -140,6 +145,7 @@ Heroes of the Storm **리플레이(.StormReplay)를 브라우저에서 바로 �
 | `tools/build_data.py` | `js/data_maps.js` · `js/data_heroes.js` · `js/py_bundle.js` · `samples/` |
 | `tools/build_pathing.py` | `js/data_pathing.js` (3D 전장 데이터 → 통행 격자) |
 | `tools/build_talents.py` | `js/data_talents.js` · `talents/` |
+| `tools/build_roles.py` | `js/data_heroes.js` 에 영웅 역할군을 붙인다 |
 | `tools/make_lite_maps.py` | `maps_lite/` (원본 지도 → 가벼운 판) |
 | `tools/devserver.py` | 개발용 정적 서버 (캐시 끔). `python tools/devserver.py` → `localhost:8124` |
 
