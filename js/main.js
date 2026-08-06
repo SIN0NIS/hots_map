@@ -26,6 +26,16 @@ function setUIMode(m){
 document.querySelectorAll('#modebar .tab').forEach(b=>
   b.onclick=()=>setUIMode(b.dataset.mode));
 
+/* 조용히 죽는 것을 막는 그물.
+   이번에 «재생을 눌러도 아무 일이 없다» 의 원인이 부팅 중 ReferenceError 였는데,
+   화면에는 아무 표시도 나지 않아 찾는 데 오래 걸렸다. 첫 오류만이라도 알린다. */
+let bootErrShown = false;
+window.addEventListener('error', e=>{
+  if(bootErrShown) return;
+  bootErrShown = true;
+  try{ setStatus('⚠ 오류: ' + (e.message||e) + ' — 콘솔(F12)에 자세한 내용'); }catch(_){}
+});
+
 /* --- 재생 루프 --- */
 const clock=document.getElementById('clock'), seek=document.getElementById('seek'), playBtn=document.getElementById('play');
 /* 재생 루프.
@@ -177,7 +187,6 @@ closeRep.onclick=()=>{
   G=null; repSlug=null; tCur=0; playing=false; logCount=-1;
   playBtn.textContent='▶ 재생'; seek.value=0; clock.firstChild.textContent='00:00';
   document.getElementById('mapName').textContent='';
-  setTeamHint();
   logEl.innerHTML='<div class="empty">리플레이를 열면 이벤트가 여기에 표시됩니다</div>';
   document.body.classList.remove('has-replay');
   buildTeamBar(); buildTimeline();
@@ -313,10 +322,17 @@ window.addEventListener('keydown',function(e){
   else if(e.key==='ArrowLeft'){ e.preventDefault(); tCur=Math.max(0,tCur-5); logCount=-1; markDirty(); }
 });
 
-/* --- 부트: 맵 보기로 시작한다 (리플레이를 열면 재생 모드로 바뀐다) --- */
-setTeamHint();
-setUIMode('map');
-const START_MAP='cursed_hollow';
-const startM=MAP_DB.find(m=>m.slug===START_MAP)||MAP_DB[0];
-if(startM){ loadMapBySlug(startM.slug); syncHiResBtn(); }
+/* --- 부트: 맵 보기로 시작한다 (리플레이를 열면 재생 모드로 바뀐다) ---
+   부트가 중간에 걸려도 재생 루프만은 반드시 돌게 한다. 예전에 여기서 예외가
+   나면 그 아래 startLoop() 이 통째로 건너뛰어져, 재생을 눌러도 아무 일이
+   일어나지 않았다 (화면에는 아무 표시도 없었다). */
+try{
+  setUIMode('map');
+  const START_MAP='cursed_hollow';
+  const startM=MAP_DB.find(m=>m.slug===START_MAP)||MAP_DB[0];
+  if(startM){ loadMapBySlug(startM.slug); syncHiResBtn(); }
+}catch(err){
+  console.error('초기화 오류', err);
+  setStatus('⚠ 초기화 중 오류: ' + (err && err.message || err));
+}
 startLoop();
