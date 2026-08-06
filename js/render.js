@@ -50,6 +50,9 @@ function resizeOverlay(){
   const w=Math.max(1,stage.clientWidth), h=Math.max(1,stage.clientHeight);
   const bw=Math.round(w*DPR), bh=Math.round(h*DPR);
   if(cv.width!==bw||cv.height!==bh){ cv.width=bw; cv.height=bh; }
+  // 스테이지가 커지면 «다 보이는 배율» 도 커진다. 다시 잡아 주지 않으면
+  // 지도가 화면보다 작아진 채로 남는다 (스코어보드를 접었을 때 등).
+  if(typeof apply==='function') apply();
   markDirty();
 }
 /* 패널이 열리고 닫히면 스테이지 크기가 바뀐다. 그때 오버레이 크기를 다시 잡지

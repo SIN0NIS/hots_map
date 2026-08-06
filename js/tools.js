@@ -326,19 +326,23 @@ function mapPt(e){
   const r=stage.getBoundingClientRect();
   return {x:(e.clientX-r.left-ox)/z, y:(e.clientY-r.top-oy)/z};
 }
+/* 무엇을 눌렀나 — «화면에 보이는 상자» 를 그대로 판정에 쓴다.
+   예전에는 종류마다 «중심에서 몇 px 위, 반지름 몇» 을 손으로 적어 뒀는데,
+   색핀은 그 값이 실제 모양과 어긋나 위쪽 30% 만 눌렸다 (영웅핀은 맞아서
+   «영웅핀만 골라진다» 처럼 보였다). 요소의 실제 사각형을 맵 좌표로 되돌려
+   판정하면 보이는 대로 눌린다 — 모양이 바뀌어도 따로 손댈 필요가 없다.
+   누를 때만 부르므로 getBoundingClientRect 비용은 문제되지 않는다. */
 function hit(p){
+  const rc = stage.getBoundingClientRect();
   for(let i=ST.objs.length-1;i>=0;i--){
     const o=ST.objs[i];
-    if(o.type==='pin'){
-      const cy = o.hero? o.y-23/z : o.y-17/z;      // 영웅 핀은 머리가 크고 높다
-      const rr = o.hero? 20/z : 20/z;
-      if(Math.hypot(p.x-o.x,p.y-cy)<=rr) return o;
-    }else if(o.type==='tok'){
-      if(Math.hypot(p.x-o.x,p.y-o.y)<=o.s/2+6/z) return o;
-    }else{
-      const h=(o.el.naturalHeight&&o.el.naturalWidth)?o.s*o.el.naturalHeight/o.el.naturalWidth:o.s;
-      if(Math.abs(p.x-o.x)<=o.s/2&&Math.abs(p.y-o.y)<=h/2) return o;
-    }
+    // 영웅핀의 겉껍질은 크기가 0 이다 (안쪽 .pinh 가 실제로 보이는 부분)
+    const vis = (o.el.querySelector && o.el.querySelector('.pinh, .pinb')) || o.el;
+    const r = vis.getBoundingClientRect();
+    if(!r.width && !r.height) continue;
+    const x0=(r.left  -rc.left-ox)/z, x1=(r.right -rc.left-ox)/z;
+    const y0=(r.top   -rc.top -oy)/z, y1=(r.bottom-rc.top -oy)/z;
+    if(p.x>=x0 && p.x<=x1 && p.y>=y0 && p.y<=y1) return o;
   }
   return null;
 }

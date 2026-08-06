@@ -2,14 +2,52 @@
    #world 전체를 CSS transform 으로 움직인다. 핀은 화면 크기를 유지하도록
    1/z 로 역보정한다. */
 let z=1, ox=0, oy=0;
+/* 보이는 범위를 벗어나지 않게 잡아 준다.
+     축소 — 전장이 다 보이는 배율보다 더 줄이지 않는다. 그 아래로 가면 지도가
+            점만 해지고 화면 대부분이 빈 바탕이 된다.
+     확대 — 그 배율의 16배까지. 그 이상은 어디를 보는지 알 수 없다.
+     이동 — 지도가 화면보다 작은 쪽은 가운데 고정, 큰 쪽은 가장자리가 화면 안으로
+            들어오지 않게 막는다 (엉뚱한 빈 곳을 보게 되던 문제).
+   기준은 «실제로 보이는 것» 이다. 배경 그림은 월드 상자(CW×CH) 밖으로 삐져나가는
+   일이 흔해서 (저주받은 골짜기: 월드 0~1800 인데 그림은 -501~2301), 월드만 기준으로
+   잡으면 지도 가장자리를 볼 수 없게 된다. 그래서 둘을 합친 상자를 쓴다. */
+const ZOOM_MAX_MUL = 16;
+function contentBox(){
+  let x0=0, y0=0, x1=CW, y1=CH;
+  if(bgEl && bgEl.style.display!=='none' && bgEl.style.width){
+    const L=parseFloat(bgEl.style.left)||0, T=parseFloat(bgEl.style.top)||0;
+    const W=parseFloat(bgEl.style.width)||0, H=parseFloat(bgEl.style.height)||0;
+    if(W>0 && H>0){
+      x0=Math.min(x0,L); y0=Math.min(y0,T);
+      x1=Math.max(x1,L+W); y1=Math.max(y1,T+H);
+    }
+  }
+  return {x0, y0, w:Math.max(1,x1-x0), h:Math.max(1,y1-y0)};
+}
+function clampView(){
+  const vw=stage.clientWidth, vh=stage.clientHeight;
+  if(!vw || !vh || !CW || !CH) return;
+  const B=contentBox();
+  const zmin=Math.min(vw/B.w, vh/B.h)*0.98;
+  z = Math.max(zmin, Math.min(zmin*ZOOM_MAX_MUL, z));
+  // 화면에서 내용이 차지하는 구간은 [ox + x0*z, ox + (x0+w)*z]
+  const cw=B.w*z, ch=B.h*z;
+  ox = cw<=vw ? (vw-cw)/2 - B.x0*z : Math.max(vw-(B.x0+B.w)*z, Math.min(-B.x0*z, ox));
+  oy = ch<=vh ? (vh-ch)/2 - B.y0*z : Math.max(vh-(B.y0+B.h)*z, Math.min(-B.y0*z, oy));
+}
 function apply(){
+  clampView();
   world.style.transform="translate("+ox+"px,"+oy+"px) scale("+z+")";
   document.getElementById('zv').textContent=Math.round(z*100)+"%";
   markDirty();                          // 영웅 표시는 줌에 맞춰 다시 그려야 한다
   if(typeof ST==='undefined') return;   // tools.js 로드 전 호출 대비 (스크립트 순서 방어)
   ST.objs.forEach(o=>{ if(o.type==='pin') o.el.style.transform="scale("+(1/z)+")"; });
 }
-function fitZ(){ return Math.min(stage.clientWidth/CW, stage.clientHeight/CH)*0.98; }
+/* 전장 전체가 들어오는 배율 = 더 줄일 수 없는 하한 */
+function fitZ(){
+  const B=contentBox();
+  return Math.min(stage.clientWidth/B.w, stage.clientHeight/B.h)*0.98;
+}
 function fit(){
   z=fitZ();
   ox=(stage.clientWidth-CW*z)/2; oy=(stage.clientHeight-CH*z)/2;
