@@ -69,10 +69,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;gap:8px;padding:8px}
   border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:6px}
 
 /* ---- 스코어보드 ---- */
-#board{flex:none;display:none;flex-direction:column;max-height:46vh;
+#board{flex:none;display:none;flex-direction:column;max-height:min(300px,42vh);
   border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
 body.mode-replay.has-replay #board{display:flex}
-#board .bdhd{flex:none;display:flex;align-items:center;gap:12px;padding:6px 10px;
+#board .bdhd{flex:none;display:flex;align-items:center;gap:12px;padding:4px 10px;
   border-bottom:1px solid var(--line)}
 #board .tbadge{flex:1;min-width:0;display:flex;align-items:center;gap:7px;font-size:13px}
 #board .tbadge.r{flex-direction:row-reverse}
@@ -93,18 +93,18 @@ body.mode-replay.has-replay #board{display:flex}
 #board .bdmini i{font-style:normal;color:var(--dim);font-size:10px;margin:0 2px}
 #board .bdmini .cl{color:var(--gold);font-size:14px}
 
-#board .bdbody{flex:1;min-height:0;display:flex;gap:8px;padding:6px;overflow:auto}
+#board .bdbody{flex:1;min-height:0;display:flex;gap:8px;padding:4px;overflow:auto}
 /* 가운데 점수 기둥 */
-#board .scorecol{flex:none;width:186px;display:flex;flex-direction:column;align-items:center;gap:7px;
-  padding:4px 10px;border-left:1px solid var(--line);border-right:1px solid var(--line);
+#board .scorecol{flex:none;width:180px;display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:2px 10px;border-left:1px solid var(--line);border-right:1px solid var(--line);
   background:color-mix(in oklab,var(--bg) 55%,transparent)}
 #board .clockwrap{display:flex;flex-direction:column;align-items:center}
-#board .clockbig{font-family:var(--mono);font-size:26px;line-height:1;color:var(--gold);
+#board .clockbig{font-family:var(--mono);font-size:23px;line-height:1;color:var(--gold);
   letter-spacing:-.01em;font-variant-numeric:tabular-nums}
 #board .clockwrap .sub{margin-top:2px;font-size:9px;letter-spacing:.05em;color:var(--dim)}
 #board .hr{width:100%;height:1px;background:var(--line);flex:none}
 #board .srow{width:100%;display:flex;align-items:center;gap:8px}
-#board .srow .v{width:48px;font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums;
+#board .srow .v{width:46px;font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;
   color:var(--dim);transition:color .15s}
 #board .srow .v.b{text-align:right} #board .srow .v.r{text-align:left}
 #board .srow .v.lead.b{color:var(--blue)} #board .srow .v.lead.r{color:var(--red)}
@@ -116,19 +116,19 @@ body.mode-replay.has-replay #board{display:flex}
 #board .tpanel{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 #board .tlhead{display:flex;align-items:center;gap:3px;padding:0 2px}
 #board .t1 .tlhead,#board .t1 .pl{flex-direction:row-reverse}
-#board .tlhead .who{width:132px;flex:none}
-#board .tlhead .tl{width:26px;flex:none;text-align:center;font-family:var(--mono);
+#board .tlhead .who{width:124px;flex:none}
+#board .tlhead .tl{width:24px;flex:none;text-align:center;font-family:var(--mono);
   font-size:9px;color:var(--dim)}
 #board .tlhead .kh{width:56px;flex:none;text-align:center;font-size:9px;color:var(--gold-dim);
   letter-spacing:.06em}
-#board .pl{display:flex;align-items:center;gap:3px;padding:2px;border:1px solid transparent;
+#board .pl{display:flex;align-items:center;gap:3px;padding:1px 2px;border:1px solid transparent;
   border-radius:5px;transition:background .12s,border-color .12s}
 #board .pl:hover{background:var(--accent)}
 #board .pl.sel{border-color:var(--gold-dim);background:var(--gold-soft)}
-#board .pl .who{width:132px;flex:none;display:flex;align-items:center;gap:6px;
+#board .pl .who{width:124px;flex:none;display:flex;align-items:center;gap:6px;
   background:none;border:none;padding:0;cursor:pointer;text-align:left;min-width:0;font:inherit;color:inherit}
 #board .t1 .pl .who{flex-direction:row-reverse;text-align:right}
-#board .pl .por{position:relative;width:32px;height:32px;flex:none;border-radius:4px;overflow:hidden;
+#board .pl .por{position:relative;width:28px;height:28px;flex:none;border-radius:4px;overflow:hidden;
   border:1px solid;background:var(--panel2)}
 #board .t0 .pl .por{border-color:var(--blue);background:var(--blue-soft)}
 #board .t1 .pl .por{border-color:var(--red);background:var(--red-soft)}
@@ -141,7 +141,7 @@ body.mode-replay.has-replay #board{display:flex}
 #board .pl .hero{font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #board .pl .user{font-size:9px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 특성 7칸 */
-#board .pl .tcell{width:26px;height:26px;flex:none;border-radius:3px;overflow:hidden;display:block;
+#board .pl .tcell{width:24px;height:24px;flex:none;border-radius:3px;overflow:hidden;display:block;
   border:1px dashed var(--line);background:color-mix(in oklab,var(--bg) 40%,transparent);opacity:.45}
 #board .pl .tcell img{width:100%;height:100%;display:block}
 #board .pl .tcell.got{opacity:1;border-style:solid;border-color:var(--line2);background:var(--panel2)}
@@ -226,9 +226,9 @@ body.mode-replay.has-replay.board-off #boardShow{display:inline-block}
 #timeline{flex:none;display:none;flex-direction:column;
   border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
 body.mode-replay.has-replay #timeline{display:flex}
-#timeline .tlwrap{position:relative;padding:0 10px 6px;display:flex;flex-direction:column;gap:1px;
+#timeline .tlwrap{position:relative;padding:0 10px 4px;display:flex;flex-direction:column;gap:1px;
   user-select:none}
-.tlrow{display:flex;align-items:center;gap:6px;height:20px}
+.tlrow{display:flex;align-items:center;gap:6px;height:19px}
 .tlrow .tag{flex:none;width:26px;font-size:9px;letter-spacing:.05em}
 .tlrow.t0 .tag{color:var(--blue)} .tlrow.t1 .tag{color:var(--red)}
 .tlrow .track{position:relative;flex:1;height:100%;cursor:pointer;overflow:visible;
@@ -258,7 +258,7 @@ body.mode-replay.has-replay #timeline{display:flex}
   background:var(--gold);transform:rotate(45deg)}
 
 /* ---- 재생 조작 막대 (타임라인 머리) ---- */
-#controls{flex:none;display:flex;align-items:center;gap:8px;height:38px;padding:0 10px;
+#controls{flex:none;display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;
   border-bottom:1px solid var(--line)}
 #controls #play{font-size:12px;padding:4px 12px;border-radius:5px;color:var(--gold);
   border-color:var(--gold-dim);background:var(--gold-soft)}
@@ -429,7 +429,8 @@ body.mode-replay:not(.has-replay) #needRep{display:block}
 .ev .ic{flex:none;font-size:11px}
 .ev .b{color:var(--blue)} .ev .r{color:var(--red)} .ev .g{color:var(--gold)} .ev .dim{color:var(--dim)}
 #log .empty{color:var(--dim);text-align:center;padding:30px 10px;font-size:11px}
-@media (max-width:1100px){ #side{width:20rem} }
+@media (max-width:1500px){ #side{width:22rem} }
+@media (max-width:1100px){ #side{width:19rem} }
 @media (max-width:860px){ #mid{flex-direction:column}
   #side{width:100%;height:36%;flex-direction:row}
   #side .rail.log,#side .rail.xp{flex:1}

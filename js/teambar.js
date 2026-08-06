@@ -266,17 +266,22 @@ function updateScore(){
         +`레벨 ${lv[i]+1} 까지 약 ${Math.max(0,Math.round(need-now)).toLocaleString()} (문턱 약 ${need.toLocaleString()}+)`
       : `${i+1}팀 레벨 ${lv[i]}`;
   }
-  // 접었을 때 쓰는 한 줄 요약
-  bdMini.innerHTML =
+  // 접었을 때 쓰는 한 줄 요약. 내용이 바뀔 때만 다시 쓴다 —
+  // 매 프레임 innerHTML 을 갈면 노드 13개를 초당 60번 새로 만든다.
+  const mini =
     `<b class="b">${lv[0]}</b><i>렙</i><b class="b">${k[0]}</b><i>킬</i><b class="b">${s[0]}</b><i>건물</i>`+
     `<span class="cl">${fmtT(tCur)}</span>`+
     `<b class="r">${s[1]}</b><i>건물</i><b class="r">${k[1]}</b><i>킬</i><b class="r">${lv[1]}</b><i>렙</i>`;
+  if(bdMini.innerHTML!==mini) bdMini.innerHTML=mini;
 }
 
 /* ---- 스코어보드 접기: 펼침 → 한 줄 → 숨김 → 펼침 ---- */
 const boardEl=document.getElementById('board');
 const bdTgl=document.getElementById('bdTgl');
-let boardState=0;                          // 0 펼침 · 1 한 줄 · 2 숨김
+/* 리플레이를 열면 «한 줄» 로 시작한다 — 1366x768 같은 노트북에서 스코어보드를
+   펼친 채로 두면 지도 칸이 289px 밖에 안 남아 전장이 우표만 해진다.
+   자세히 볼 때만 ⌄ 또는 Tab 으로 펼친다. */
+let boardState=1;                          // 0 펼침 · 1 한 줄 · 2 숨김
 function setBoardState(s){
   boardState=(s+3)%3;
   boardEl.classList.toggle('mini', boardState===1);
@@ -287,3 +292,4 @@ function setBoardState(s){
   requestAnimationFrame(()=>{ resizeOverlay(); if(typeof drawXp==='function') drawXp(); });
 }
 bdTgl.onclick=()=>setBoardState(boardState+1);
+setBoardState(boardState);
