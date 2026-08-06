@@ -258,8 +258,13 @@ function fillBoardHead(raw, t0, t1){
   document.getElementById('bdName1').textContent = name(t1) + ' 2팀';
   document.getElementById('bdMap').textContent = raw.map || '알 수 없는 전장';
   const mins = Math.round((G.maxT||0)/60);
-  document.getElementById('bdSub').textContent =
-    `${fmtT(G.maxT||0)} · 선수 ${(t0.length+t1.length)}명 · 이벤트 ${G.evs.length}건`;
+  const sub=document.getElementById('bdSub');
+  sub.textContent = `${fmtT(G.maxT||0)} · 선수 ${(t0.length+t1.length)}명 · 이벤트 ${G.evs.length}건`;
+  // 리플레이 빌드와 담아 둔 프로토콜이 다르면 값이 조용히 어긋날 수 있다.
+  // 지금까지는 문제없이 읽히지만, 이상하면 여기부터 의심하도록 남겨 둔다.
+  sub.title = (raw.build && raw.parser_build && raw.build !== raw.parser_build)
+    ? `리플레이 빌드 ${raw.build} · 파서 빌드 ${raw.parser_build} — 다르지만 읽혔습니다`
+    : `빌드 ${raw.build||'?'}`;
   // 승리 팀 — 핵이 부서진 쪽의 반대. 부서진 핵이 없으면 표시하지 않는다.
   let win = null;
   for(const e of G.evs){

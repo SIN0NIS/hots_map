@@ -20,9 +20,21 @@ SKIP_STAT = {"RegenGlobePickedUp", "PeriodicXPBreakdown", "PlayerInit",
 def ds(v):
     return v.decode("utf-8", errors="replace") if isinstance(v, bytes) else v
 
+BUNDLED_BUILD = 91756          # py/protocol91756.py 가 만들어진 빌드
+
 def extract(path):
     archive = mpyq.MPQArchive(path)
     protocol = _proto
+
+    # 리플레이가 만들어진 빌드를 확인한다. 빌드마다 스키마가 달라서 다른 빌드의
+    # 리플레이는 조용히 어긋난 값을 뱉을 수 있다. 담아 둔 프로토콜이 하나뿐이라
+    # 일단 시도는 하되, 다르면 결과에 적어 화면에서 알 수 있게 한다.
+    build = None
+    try:
+        header = protocol.decode_replay_header(archive.header["user_data_header"]["content"])
+        build = header["m_version"]["m_baseBuild"]
+    except Exception:
+        pass
 
     details = protocol.decode_replay_details(archive.read_file("replay.details"))
     players = {}
@@ -45,17 +57,40 @@ def extract(path):
     # 첸의 정령(HeroChenStorm...), 아바투르 궁극 진화체, 사무로 분신 등이 섞이면
     # 한 트랙 안에서 좌표가 널뛴다. 경기 시작 때 태어난 것을 본체로 본다.
     main_unit = {}                 # pid -> 본체 유닛 이름
-    hero_idx = {}                  # unitTagIndex -> pid (본체만)
+    hero_idx = {}                  # unitTagIndex -> pid (본체만 · 지금 살아 있는 것)
+    # 유닛 식별자는 "인덱스-재활용번호" 여야 한다. 인덱스만 쓰면 서로 다른 유닛이
+    # 섞인다 (실측: Born 2032건이 인덱스 253개를 돌려 쓰고, 한 인덱스는 25번 재사용).
+    # 다만 SUnitPositionsEvent 는 인덱스만 주므로, 인덱스 -> 지금 살아 있는 uid 를
+    # 따로 들고 다니며 Born/Died 로 갱신한다.
+    live_uid = {}                  # unitTagIndex -> "인덱스-재활용번호"
+    def uid_of(ev):
+        return f'{ev["m_unitTagIndex"]}-{ev.get("m_unitTagRecycle", 0)}'
 
-    tracker = protocol.decode_replay_tracker_events(archive.read_file("replay.tracker.events"))
+    tracker = list(protocol.decode_replay_tracker_events(archive.read_file("replay.tracker.events")))
+
+    # 게임 시계의 0:00 은 «성문이 열리는 순간» 이다. 그 전은 준비 시간이라
+    # 게임 내 시계에 안 잡힌다. 예전에는 gameloop//16 을 그대로 써서 화면의
+    # 모든 시각이 실제보다 빨랐다 — 정식 전장 38초, 난투 전장 75초 (실측).
+    # 관례로 610 을 쓰는 코드가 많은데 난투는 1206 이라 하드코딩하면 틀린다.
+    T0 = 0
     for ev in tracker:
-        sec, et = ev["_gameloop"] // 16, ev["_event"]
+        if (ev["_event"] == "NNet.Replay.Tracker.SStatGameEvent"
+                and ds(ev["m_eventName"]) == "GatesOpen"):
+            T0 = ev["_gameloop"]; break
+    # 16 게임루프 = 1초. 준비 시간의 사건은 0 초로 몰아 둔다 (스폰 위치 등).
+    def sec_of(loop):
+        return round(max(0.0, (loop - T0) / 16.0), 2)
+
+    for ev in tracker:
+        sec, et = sec_of(ev["_gameloop"]), ev["_event"]
 
         if et == "NNet.Replay.Tracker.SUnitBornEvent":
             idx = ev["m_unitTagIndex"]
+            uid = uid_of(ev)
             uname = ds(ev["m_unitTypeName"])
             pid = ev["m_controlPlayerId"]
-            tag_index_info[idx] = {"name": uname, "control": pid}
+            tag_index_info[uid] = {"name": uname, "control": pid}
+            live_uid[idx] = uid
             hero_idx.pop(idx, None)          # 태그 번호는 재사용된다 — 옛 주인을 지운다
             if uname.startswith("Hero") and 1 <= pid <= 10:
                 if pid not in main_unit:
@@ -77,7 +112,7 @@ def extract(path):
 
         elif et == "NNet.Replay.Tracker.SUnitDiedEvent":
             idx = ev["m_unitTagIndex"]
-            info = tag_index_info.get(idx, {})
+            info = tag_index_info.get(uid_of(ev), {})
             uname = info.get("name", "?")
             pid = hero_idx.get(idx)
             if pid:
@@ -147,8 +182,8 @@ def extract(path):
         if ev["_event"] != "NNet.Game.SCmdEvent":
             continue
         uid = ev["_userid"]["m_userId"]
-        sec = ev["_gameloop"] // 16
-        apm[uid][sec // 60] += 1        # 좌표 유무와 무관하게 «행동»으로 센다
+        sec = sec_of(ev["_gameloop"])   # 트래커와 같은 시계 (성문 열림 = 0:00)
+        apm[uid][int(sec // 60)] += 1   # 좌표 유무와 무관하게 «행동»으로 센다
         data = ev.get("m_data") or {}
         target = data.get("TargetPoint") or ((data.get("TargetUnit") or {}).get("m_snapshotPoint"))
         if not target:
@@ -176,6 +211,10 @@ def extract(path):
     timeline.sort(key=lambda e: e["t"])
     out = {
         "map": ds(details["m_title"]),
+        # 어느 빌드의 리플레이를 어느 프로토콜로 읽었나. 다르면 값이 조용히
+        # 어긋날 수 있어 화면에서 알 수 있게 남긴다.
+        "build": build, "parser_build": BUNDLED_BUILD,
+        "gates_open_loop": T0,
         "format_note": "t는 게임 시작 후 초. tracks/commands 항목은 [초,x,y(,출처)] 배열. "
                        "출처 s=스폰 c=전투스냅샷 d=사망 r=부활",
         "players": players,
