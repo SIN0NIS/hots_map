@@ -73,10 +73,26 @@ function structOwner(x,y){
 }
 
 let tlBuilt = false;
+let tlMarks = [];                 // 재생에 따라 옅고 진하게 바꾸려고 들고 있는다
+let selEvent = null;              // 고른 이벤트 (금색 테두리)
+
+/* 사건의 «무게» — 클수록 표식이 커진다. 레퍼런스의 weight 를 내 자료로 옮긴 것. */
+function evWeight(e){
+  switch(CAT(e)){
+    case 'kill':   return 1 + Math.min(2, (e.killers||[]).length*0.35);
+    case 'struct': {
+      const u=e.UnitType||e.unit||'';
+      return /Core|King/.test(u) ? 3.4 : /TownHallL3/.test(u) ? 2.4 : /TownHall/.test(u) ? 1.9 : 1;
+    }
+    case 'obj':  return 2.2;
+    case 'merc': return 1.2;
+    default: return 1;
+  }
+}
 function buildTimeline(){
   tlRows.forEach(r=>r.replaceChildren());
   tlAxis.replaceChildren();
-  tlBuilt = false;
+  tlBuilt = false; tlMarks = []; selEvent = null;
   if(!G || !G.maxT) return;
   buildStructSides();
   const T = G.maxT;
@@ -91,14 +107,18 @@ function buildTimeline(){
     }
     const tm = eventTeam(e, G.players);
     if(tm!==0 && tm!==1) continue;
-    const m = document.createElement('span');
+    const sz = Math.round(9 + evWeight(e)*2.6);
+    const m = document.createElement('button');
+    m.type='button';
     m.className = 'tlmark';
     m.textContent = ic;
     m.style.left = (e.t/T*100)+'%';
-    m.dataset.t = e.t;
+    m.style.width = m.style.height = sz+'px';
+    m.style.fontSize = Math.max(7, Math.round(sz*0.62))+'px';
     m.title = fmtT(e.t)+' · '+evText(e, G.players);
-    m.onclick = ev=>{ ev.stopPropagation(); seekTo(e.t); };
+    m.onpointerdown = ev=>{ ev.stopPropagation(); selEvent=e; seekTo(e.t); updateTimeline(); };
     tlRows[tm].appendChild(m);
+    tlMarks.push({el:m, t:e.t, e});
   }
   // 시간 눈금 — 2분 간격 (긴 경기는 5분)
   const stepSec = T>1500 ? 300 : 120;
@@ -109,6 +129,14 @@ function buildTimeline(){
     tlAxis.appendChild(sp);
   }
   tlBuilt = true;
+  updateTimeline();
+}
+/* 재생 조작 막대의 «이전/다음 사건» 단추 */
+function jumpEvent(dir){
+  if(!tlMarks.length) return;
+  const list = tlMarks.map(m=>m.t).sort((a,b)=>a-b);
+  if(dir<0){ for(let i=list.length-1;i>=0;i--) if(list[i] < tCur-1){ seekTo(list[i]); return; } seekTo(0); }
+  else { for(const v of list) if(v > tCur+1){ seekTo(v); return; } seekTo(G.maxT); }
 }
 /* 표식 툴팁용 짧은 글 (HTML 없이) */
 function evText(e, players){
@@ -129,13 +157,21 @@ tlRows.forEach(r=>r.onclick=ev=>tlSeekFromEvent(ev,r));
 tlAxis.onclick=ev=>tlSeekFromEvent(ev,tlAxis);
 function seekTo(t){ tCur=t; logCount=-1; markDirty(); }
 
-/* 지금 시각 표시선 */
+/* 지금 시각 표시선 · 지나간 구간 · 마커 진하기 (레퍼런스의 progress / past 처리) */
 function updateTimeline(){
   if(!G || !tlBuilt) return;
   const track = tlRows[0];
   const par = document.getElementById('timeline').getBoundingClientRect();
   const tr = track.getBoundingClientRect();
   tlNowEl.style.left = (tr.left-par.left + tCur/G.maxT*tr.width)+'px';
+  const pct = Math.max(0, Math.min(100, tCur/G.maxT*100)) + '%';
+  for(const r of tlRows) r.style.setProperty('--prog', pct);
+  for(const m of tlMarks){
+    const future = m.t > tCur;
+    if(m.el.classList.contains('future')!==future) m.el.classList.toggle('future',future);
+    const sel = selEvent===m.e;
+    if(m.el.classList.contains('sel')!==sel) m.el.classList.toggle('sel',sel);
+  }
 }
 
 /* ---------------- 시간별 경험치 그래프 ----------------
@@ -151,7 +187,7 @@ xpKindSel.onchange = drawXp;
 
 function xpTotal(r){ return r.minion+r.hero+r.struct+r.creep+r.trickle; }
 function xpVal(r,k){ return k==='total' ? xpTotal(r) : r[k]; }
-const XP_COL={minion:'#8fa3c8', creep:'#e8b64c', hero:'#ff8a94', struct:'#b9a7e0', trickle:'#5ad19a'};
+const XP_COL={minion:'#8fa3c8', creep:'#d8b260', hero:'#ff8a94', struct:'#b9a7e0', trickle:'#4dbc92'};
 
 /* 그래프 한 장 그리기. 작은 그래프(#gXp)와 큰 창(#gXpBig)이 같은 코드를 쓴다. */
 function drawXpOn(cvEl, opt){
@@ -208,7 +244,7 @@ function drawXpOn(cvEl, opt){
     }
     c.setLineDash([]);
   }
-  const COL=['#4da3ff','#ff5f6d'];
+  const COL=['#339fee','#e64343'];
   const line=(pts,color,width,alpha)=>{
     if(pts.length<2) return;
     c.globalAlpha=alpha; c.strokeStyle=color; c.lineWidth=width; c.lineJoin='round';
@@ -233,7 +269,7 @@ function drawXpOn(cvEl, opt){
 /* 범례 = 현재 시각의 값 */
 function xpLegendHTML(kind, withSub){
   const rows=(G&&G.teamXp)||[]; if(!rows.length) return '';
-  const COL=['#4da3ff','#ff5f6d'];
+  const COL=['#339fee','#e64343'];
   const cur=[null,null];
   for(const r of rows) if(r.t<=tCur) cur[r.team]=r;
   const n=v=>v==null?'-':Math.round(v).toLocaleString();

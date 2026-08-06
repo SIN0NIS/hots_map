@@ -15,3 +15,6 @@ __pycache__/
 
 # 작업 중 임시
 _tmp_*/
+
+# UI 시안 (별개 Next.js 프로젝트 — 배치를 옮겨 오는 데만 쓴다)
+reference/

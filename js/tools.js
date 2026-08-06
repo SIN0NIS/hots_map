@@ -1,8 +1,8 @@
 /* ================= 전술 도구 (펜 · 지우개 · 핀 · 토큰 · 이미지) ================= */
 const tbar=document.getElementById('tbar'), tgl=document.getElementById('tgl'), trash=document.getElementById('trash');
 let toolOn=false, mode='pan', penSz=6, tokSz=44, color='#ff4d4d';
-const COLORS=['#ff4d4d','#4da3ff','#ffd24d','#5dde7a','#c07bff','#ffffff','#14181f'];
-const TEAMC={blue:'#3b82f6',red:'#e5484d'};
+const COLORS=['#ff4d4d','#339fee','#ffd24d','#5dde7a','#c07bff','#ffffff','#14181f'];
+const TEAMC={blue:'#339fee',red:'#e64343'};   // css/style.css 의 --blue/--red 와 같은 색
 let team='blue', heroSel=null;            // heroSel: null=기본, {name,src}
 const cnt={blue:0,red:0};
 const ST={objs:[],strokes:[],hist:[]};    // 단일 상태 (현재 보드)
@@ -248,7 +248,7 @@ function addTok(x,y){
     const im=document.createElement('img');
     im.src=heroSel.src; im.draggable=false;
     el.appendChild(im);
-    el.style.background='#0e1116'; el.title=o.hero;
+    el.style.background='#06101c'; el.title=o.hero;
   }else{
     el.textContent=(team==='blue'?'B':'R')+(++cnt[team]);
   }

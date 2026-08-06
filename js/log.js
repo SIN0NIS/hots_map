@@ -6,6 +6,7 @@ const logEl=document.getElementById('log');
 const filters={kill:true,struct:true,merc:true,obj:true,grow:false,misc:true};
 let logCount=-1;
 const LOG_MAX=250;              // 화면에 유지할 최대 줄 수
+const logCntEl=document.getElementById('logCnt');
 
 let flt=[];                     // 필터를 통과한 이벤트 (시간순)
 let firstShown=0, shown=0;      // 화면에 올라간 구간 [firstShown, shown)
@@ -49,6 +50,11 @@ function renderLog(){
         if(shown===0&&!logEl.firstElementChild)
           logEl.innerHTML='<div class="empty">재생하면 이벤트가 여기에 표시됩니다</div>'; }
     }
+  }
+  // 머리줄의 «지나온 것 / 전체» (flt 는 logRebuild 가 채운다 — 그 뒤에 센다)
+  if(logCntEl){
+    const s=`${shown}/${flt.length}`;
+    if(logCntEl.textContent!==s) logCntEl.textContent=s;
   }
   // 최근 2초 강조는 «끝쪽 연속 구간» 이라, 끝에서부터 오래된 줄을 만나면 멈춘다
   const kids=logEl.children;

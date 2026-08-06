@@ -1,173 +1,276 @@
+/* ================= 색·질감 토큰 =================
+   reference/heroes-of-the-storm-analyzer 의 팔레트를 그대로 옮겼다.
+   짙은 넥서스 블루 바탕 + 아케인 골드 강조 + 팀 하늘색/진홍.
+   oklch 로 적어야 원본과 같은 밝기가 나온다 (hex 대응값은 주석에 남긴다). */
 :root{
-  --bg:#0e1219; --panel:#161c28; --panel2:#1c2434; --line:#26304a;
-  --ink:#d7deea; --dim:#7d8aa5; --blue:#4da3ff; --red:#ff5f6d;
-  --gold:#e8b64c; --green:#5ad19a; --mono:ui-monospace,'Cascadia Mono','D2Coding',Consolas,monospace;
+  --bg:oklch(0.17 0.03 255);          /* #06101c */
+  --panel:oklch(0.22 0.035 257);      /* #101b2b */
+  --panel2:oklch(0.27 0.035 257);     /* #1b2737 */
+  --accent:oklch(0.3 0.04 257);       /* #212e42 — 마우스 올렸을 때 */
+  --line:oklch(0.82 0.08 88 / 18%);   /* 금빛이 섞인 테두리 */
+  --line2:oklch(0.82 0.08 88 / 32%);
+  --ink:oklch(0.93 0.02 90);          /* #ede8d9 */
+  --dim:oklch(0.7 0.025 250);         /* #93a0ae */
+  --blue:oklch(0.68 0.15 245);        /* #339fee */
+  --red:oklch(0.62 0.2 25);           /* #e64343 */
+  --blue-soft:oklch(0.68 0.15 245 / 18%);
+  --red-soft:oklch(0.62 0.2 25 / 18%);
+  --gold:oklch(0.78 0.11 85);         /* #d8b260 */
+  --gold-dim:oklch(0.6 0.08 85);      /* #967d46 */
+  --gold-soft:oklch(0.78 0.11 85 / 12%);
+  --green:oklch(0.72 0.12 165);       /* #4dbc92 */
+  --radius:6px;
+  --mono:ui-monospace,'Cascadia Mono','D2Coding',Consolas,monospace;
 }
+/* 패널 위쪽에 얇게 금빛이 흐르는 질감 — 레퍼런스의 .panel-frame */
+.frame{background-image:linear-gradient(to bottom,
+  color-mix(in oklab,var(--gold) 6%,transparent), transparent 40%);
+  box-shadow:inset 0 1px 0 0 color-mix(in oklab,var(--gold) 22%,transparent)}
+/* 제목용 — 레퍼런스의 .text-heading */
+.hd{letter-spacing:.09em;text-transform:uppercase;font-weight:600}
 *{box-sizing:border-box;margin:0;padding:0}
 /* height 두 줄: iOS 사파리에서 100vh 는 주소창을 뺀 높이라 하단 컨트롤이 바에 가린다.
    dvh 를 뒤에 둬서 지원 브라우저는 이쪽을, 옛 브라우저는 앞줄을 쓴다. */
 body{background:var(--bg);color:var(--ink);font-family:'Pretendard','Malgun Gothic','Segoe UI',sans-serif;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-/* ---- 상단 고정 모드 바 ---- */
-#modebar{flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;
-  height:44px;background:var(--panel);border-bottom:1px solid var(--line)}
-#modebar h1{font-size:14px;font-weight:700;letter-spacing:.06em;white-space:nowrap}
-#modebar .tabs{display:flex;gap:0;align-self:stretch}
-#modebar .tab{background:none;border:none;border-bottom:2px solid transparent;border-radius:0;
-  color:var(--dim);font-family:inherit;font-size:13px;font-weight:600;padding:0 16px;
-  cursor:pointer;white-space:nowrap}
-#modebar .tab:hover{color:var(--ink)}
-#modebar .tab.on{color:var(--gold);border-bottom-color:var(--gold)}
-#modebar .map-name{color:var(--gold);font-size:12px;margin-left:auto;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ---- 머리줄 (레퍼런스의 site-header) ---- */
+#modebar{flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;
+  height:48px;background:var(--panel);border-bottom:1px solid var(--line)}
+#modebar .logo{display:flex;align-items:center;gap:8px;flex:none}
+#modebar .logo i{font-style:normal;font-size:20px;color:var(--gold);line-height:1}
+#modebar .logo .tt{display:flex;flex-direction:column;line-height:1.25}
+#modebar .logo b{font-size:13px;color:var(--gold);letter-spacing:.07em}
+#modebar .logo em{font-style:normal;font-size:9px;color:var(--dim);letter-spacing:.04em}
+#modebar .tabs{display:flex;gap:3px}
+#modebar .tab{background:none;border:1px solid transparent;border-radius:5px;
+  color:var(--dim);font-family:inherit;font-size:12px;font-weight:500;padding:5px 12px;
+  cursor:pointer;white-space:nowrap;letter-spacing:.03em}
+#modebar .tab:hover{color:var(--ink);background:var(--accent);border-color:var(--line)}
+#modebar .tab.on{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-soft)}
+#modebar .hgroup{margin-left:auto;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+#modebar .map-name{color:var(--gold-dim);font-size:11px;flex:none;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+#modebar label.load{font-size:11px;color:var(--dim);border:1px solid var(--line);
+  padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap}
+#modebar label.load:hover{color:var(--ink);border-color:var(--line2)}
+#modebar input[type=file]{display:none}
+#modebar select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+  border-radius:4px;font:inherit;font-size:11px;padding:4px 6px;cursor:pointer;max-width:180px}
+#modebar select:hover{border-color:var(--line2)}
+#modebar select:disabled{opacity:.45;cursor:default}
 
-/* ---- 게임식 상단 스코어보드 ---- */
-#topbar{flex:none;display:none;align-items:stretch;gap:10px;padding:6px 10px;
-  background:linear-gradient(#1a2130,#141a26);border-bottom:1px solid var(--line)}
-body.mode-replay.has-replay #topbar{display:flex}
-#topbar .tside{flex:1;display:flex;gap:6px;min-width:0}
-#topbar .tside.t1{flex-direction:row-reverse}
-#topbar .tcenter{flex:none;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:3px;padding:0 12px;min-width:236px}
-/* 팀 레벨·킬·건물은 «시계를 가운데 두고» 좌우로 갈라 놓는다 */
-#topbar .score{display:flex;align-items:center;gap:14px}
-#topbar .sc{display:flex;flex-direction:column;gap:1px;min-width:72px;align-items:flex-end}
-#topbar .sc.r{align-items:flex-start}
-#topbar .lv{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1}
-#topbar .sc.b .lv{color:var(--blue)} #topbar .sc.r .lv{color:var(--red)}
-#topbar .clockbig{font-family:var(--mono);font-size:20px;letter-spacing:.04em;
-  background:#0d1118;border:1px solid var(--line);border-radius:5px;padding:2px 10px}
-#topbar .kb{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--dim);white-space:nowrap}
-#topbar .sc.r .kb{flex-direction:row-reverse}
-#topbar .kb b{font-family:var(--mono);font-size:14px}
-#topbar .sc.b .kb b{color:var(--blue)} #topbar .sc.r .kb b{color:var(--red)}
-#topbar .kb i{font-style:normal;opacity:.7}
-/* 통계 페이지 전환 (참고: SpazzoReplayStatKit 의 Control+1~6 방식) */
+/* ================= 리플레이 화면 뼈대 =================
+   reference/heroes-of-the-storm-analyzer 의 replay-analyzer 배치를 옮겼다.
+     [스코어보드]                      전체 폭
+     [지도            | 우측 레일]      늘어나는 칸
+     [이벤트 타임라인]                  전체 폭 */
+main{flex:1;display:flex;flex-direction:column;min-height:0;gap:8px;padding:8px}
+#mid{flex:1;display:flex;min-height:170px;gap:8px}
+#mapwrap{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;gap:6px;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:6px}
+
+/* ---- 스코어보드 ---- */
+#board{flex:none;display:none;flex-direction:column;max-height:46vh;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+body.mode-replay.has-replay #board{display:flex}
+#board .bdhd{flex:none;display:flex;align-items:center;gap:12px;padding:6px 10px;
+  border-bottom:1px solid var(--line)}
+#board .tbadge{flex:1;min-width:0;display:flex;align-items:center;gap:7px;font-size:13px}
+#board .tbadge.r{flex-direction:row-reverse}
+#board .tbadge i{font-style:normal;font-size:14px;flex:none}
+#board .tbadge b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.05em}
+#board .tbadge.b b,#board .tbadge.b i{color:var(--blue)}
+#board .tbadge.r b,#board .tbadge.r i{color:var(--red)}
+#board .tbadge em{flex:none;font-style:normal;font-size:9px;letter-spacing:.14em;color:var(--gold);
+  border:1px solid var(--gold-dim);background:var(--gold-soft);border-radius:3px;padding:1px 5px}
+#board .bdmid{flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:0 8px}
+#board .bdmid b{font-size:11px;color:var(--gold)}
+#board .bdmid .sub{font-size:10px;color:var(--dim)}
+#board #bdTgl{flex:none;font-size:12px;line-height:1;padding:3px 8px;border-radius:4px;
+  color:var(--dim);transition:transform .15s}
+#board #bdTgl:hover{color:var(--gold);border-color:var(--gold-dim)}
+#board .bdmini{display:none;font-family:var(--mono);font-size:12px;gap:10px;align-items:center}
+#board .bdmini b.b{color:var(--blue)} #board .bdmini b.r{color:var(--red)}
+#board .bdmini i{font-style:normal;color:var(--dim);font-size:10px;margin:0 2px}
+#board .bdmini .cl{color:var(--gold);font-size:14px}
+
+#board .bdbody{flex:1;min-height:0;display:flex;gap:8px;padding:6px;overflow:auto}
+/* 가운데 점수 기둥 */
+#board .scorecol{flex:none;width:186px;display:flex;flex-direction:column;align-items:center;gap:7px;
+  padding:4px 10px;border-left:1px solid var(--line);border-right:1px solid var(--line);
+  background:color-mix(in oklab,var(--bg) 55%,transparent)}
+#board .clockwrap{display:flex;flex-direction:column;align-items:center}
+#board .clockbig{font-family:var(--mono);font-size:26px;line-height:1;color:var(--gold);
+  letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+#board .clockwrap .sub{margin-top:2px;font-size:9px;letter-spacing:.05em;color:var(--dim)}
+#board .hr{width:100%;height:1px;background:var(--line);flex:none}
+#board .srow{width:100%;display:flex;align-items:center;gap:8px}
+#board .srow .v{width:48px;font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums;
+  color:var(--dim);transition:color .15s}
+#board .srow .v.b{text-align:right} #board .srow .v.r{text-align:left}
+#board .srow .v.lead.b{color:var(--blue)} #board .srow .v.lead.r{color:var(--red)}
+#board .srow .mid{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px}
+#board .srow .mid i{font-style:normal;font-size:12px;line-height:1;filter:saturate(.5)}
+#board .srow .mid em{font-style:normal;font-size:9px;color:var(--dim)}
+
+/* 팀 패널 — 특성 레벨 머리줄 + 선수 5줄 */
+#board .tpanel{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+#board .tlhead{display:flex;align-items:center;gap:3px;padding:0 2px}
+#board .t1 .tlhead,#board .t1 .pl{flex-direction:row-reverse}
+#board .tlhead .who{width:132px;flex:none}
+#board .tlhead .tl{width:26px;flex:none;text-align:center;font-family:var(--mono);
+  font-size:9px;color:var(--dim)}
+#board .tlhead .kh{width:56px;flex:none;text-align:center;font-size:9px;color:var(--gold-dim);
+  letter-spacing:.06em}
+#board .pl{display:flex;align-items:center;gap:3px;padding:2px;border:1px solid transparent;
+  border-radius:5px;transition:background .12s,border-color .12s}
+#board .pl:hover{background:var(--accent)}
+#board .pl.sel{border-color:var(--gold-dim);background:var(--gold-soft)}
+#board .pl .who{width:132px;flex:none;display:flex;align-items:center;gap:6px;
+  background:none;border:none;padding:0;cursor:pointer;text-align:left;min-width:0;font:inherit;color:inherit}
+#board .t1 .pl .who{flex-direction:row-reverse;text-align:right}
+#board .pl .por{position:relative;width:32px;height:32px;flex:none;border-radius:4px;overflow:hidden;
+  border:1px solid;background:var(--panel2)}
+#board .t0 .pl .por{border-color:var(--blue);background:var(--blue-soft)}
+#board .t1 .pl .por{border-color:var(--red);background:var(--red-soft)}
+#board .pl .por img{width:100%;height:100%;object-fit:cover;display:block}
+#board .pl.dead .por img{filter:grayscale(1) brightness(.5)}
+#board .pl.dead .por::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:var(--ink);font-size:15px;text-shadow:0 1px 3px #000}
+#board .pl.cast .por{box-shadow:0 0 0 2px var(--gold),0 0 8px color-mix(in oklab,var(--gold) 70%,transparent)}
+#board .pl .nmcol{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+#board .pl .hero{font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#board .pl .user{font-size:9px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 특성 7칸 */
+#board .pl .tcell{width:26px;height:26px;flex:none;border-radius:3px;overflow:hidden;display:block;
+  border:1px dashed var(--line);background:color-mix(in oklab,var(--bg) 40%,transparent);opacity:.45}
+#board .pl .tcell img{width:100%;height:100%;display:block}
+#board .pl .tcell.got{opacity:1;border-style:solid;border-color:var(--line2);background:var(--panel2)}
+#board .pl .tcell.got.noic{background:var(--gold);border-color:var(--gold)}
+#board .pl .tcell.fresh{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+/* 오른쪽 수치 칸 — 페이지에 따라 관여/APM/XP 가 들어간다 */
+#board .pl .kda{width:56px;flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;
+  font-family:var(--mono);font-size:10px;line-height:1.3;
+  border-left:1px solid var(--line);margin-left:3px;padding-left:3px}
+#board .t1 .pl .kda{border-left:none;border-right:1px solid var(--line);
+  margin:0 3px 0 0;padding:0 3px 0 0}
+#board .pl .kda b{font-weight:600}
+#board .pl .kda em{font-style:normal;color:var(--dim);font-size:9px}
+#board .pl .kda .k{color:var(--green)} #board .pl .kda .d{color:var(--red)}
+/* 스킬 사용 칸 */
+#board .pl .sk{display:flex;gap:2px;margin-left:3px}
+#board .t1 .pl .sk{flex-direction:row-reverse;margin:0 3px 0 0}
+#board .pl .sk u{width:4px;height:14px;border-radius:1px;background:var(--panel2);display:block;
+  text-decoration:none}
+#board .pl .sk u.hot{background:var(--gold)}
+/* 통계 페이지 단추 */
 .pagetabs{display:flex;gap:3px}
 .pagetabs button{font-size:10px;padding:2px 8px;border-radius:4px;color:var(--dim);
   font-family:inherit;line-height:1.5}
-.pagetabs button.on{color:var(--gold);border-color:var(--gold);background:#2a2416}
-/* 선수 통계 줄 — 페이지에 따라 특성/KDA/APM/XP 가 들어간다 */
-.pl .stat{display:flex;gap:6px;font-size:10px;color:var(--dim);font-family:var(--mono);
-  white-space:nowrap;overflow:hidden}
-.tside.t1 .pl .stat{flex-direction:row-reverse}
-.pl .stat s{text-decoration:none;color:var(--ink)}
-.pl .stat s.k{color:#5ad19a} .pl .stat s.d{color:var(--red)}
+.pagetabs button.on{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-soft)}
 
-/* 선수 한 명 = 초상화 + 특성 줄 + 스킬 사용 표시 */
-.pl{flex:1;min-width:0;max-width:168px;display:flex;gap:5px;align-items:center;
-  background:#141a25;border:1px solid var(--line);border-radius:6px;padding:4px 5px}
-.tside.t1 .pl{flex-direction:row-reverse}
-.pl.b{border-left:3px solid var(--blue)} .pl.r{border-right:3px solid var(--red)}
-.pl .por{position:relative;width:42px;height:42px;flex:none;border-radius:6px;overflow:hidden;
-  border:2px solid var(--line);background:var(--panel2)}
-.pl.b .por{border-color:var(--blue)} .pl.r .por{border-color:var(--red)}
-.pl .por img{width:100%;height:100%;object-fit:cover;display:block}
-.pl.dead .por img{filter:grayscale(1) brightness(.55)}
-.pl.dead .por::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;
-  justify-content:center;color:#e6ecf5;font-size:19px;text-shadow:0 1px 3px #000}
-/* 스킬을 방금 쓰면 초상화 테두리가 번쩍인다 */
-.pl.cast .por{box-shadow:0 0 0 2px var(--gold),0 0 9px rgba(232,182,76,.8)}
-.pl .col{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
-.pl .nm{font-size:10px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tside.t1 .pl .nm{text-align:right}
-/* 특성: 티어 7칸. 찍은 것만 아이콘이 뜬다 */
-.pl .tal{display:flex;gap:2px}
-.tside.t1 .pl .tal{flex-direction:row-reverse}
-.pl .tal i{width:20px;height:20px;border-radius:4px;background:#11151d;
-  border:1px solid var(--line);overflow:hidden;flex:none;display:block;opacity:.28}
-.pl .tal i img{width:100%;height:100%;display:block}
-.pl .tal i.got{opacity:1;border-color:#4a5670}
-.pl .tal i.got.noic{background:var(--gold);opacity:.9}
-.pl .tal i.fresh{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
-/* 스킬 사용 칸 */
-.pl .sk{display:flex;gap:2px}
-.tside.t1 .pl .sk{flex-direction:row-reverse}
-.pl .sk u{width:12px;height:5px;border-radius:1px;background:#232c3d;display:block;text-decoration:none}
-.pl .sk u.hot{background:var(--gold)}
+/* 접힘 3단계: 펼침 → 한 줄 → 숨김 */
+#board.mini .bdbody{display:none}
+#board.mini .bdmini{display:flex}
+#board.mini #bdTgl{transform:rotate(-90deg)}
+body.mode-replay.has-replay.board-off #board{display:none}
+#boardShow{display:none}
+body.mode-replay.has-replay.board-off #boardShow{display:inline-block}
 
 /* ---- 경험치 그래프 크게 보기 ---- */
-#xpModal{position:fixed;inset:0;z-index:70;background:rgba(6,9,14,.82);
+#xpModal{position:fixed;inset:0;z-index:70;background:color-mix(in oklab,var(--bg) 85%,transparent);
   display:flex;align-items:center;justify-content:center;padding:24px}
 #xpModal[hidden]{display:none}
 #xpModal .xmbox{width:min(1180px,96vw);height:min(760px,92vh);display:flex;flex-direction:column;
-  gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  gap:8px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:12px 14px}
 #xpModal .xmhd{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink)}
 #xpModal .xmhd select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
   border-radius:4px;font:inherit;font-size:12px;padding:3px 6px;cursor:pointer}
 #xpModal .ck{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);cursor:pointer}
 #xpModal #xpClose{margin-left:auto;font-size:14px;padding:2px 10px;border-radius:4px;color:var(--dim)}
-#gXpBig{flex:1;min-height:0;width:100%;background:#11151d;border:1px solid var(--line);border-radius:6px;cursor:crosshair}
+#gXpBig{flex:1;min-height:0;width:100%;background:color-mix(in oklab,var(--bg) 60%,transparent);
+  border:1px solid var(--line);border-radius:6px;cursor:crosshair}
 #xpLegend2{display:flex;gap:12px;font-size:11px;color:var(--dim);flex-wrap:wrap}
 #xpLegend2 b{font-family:var(--mono);color:var(--ink)}
 #lvTable{flex:none;max-height:96px;overflow:auto;display:flex;flex-wrap:wrap;gap:3px 8px;
   font-size:10px;color:var(--dim);font-family:var(--mono);border-top:1px solid var(--line);padding-top:6px}
 #lvTable span{white-space:nowrap}
 #lvTable span.on{color:var(--gold)}
-#lvTable .note{width:100%;font-family:inherit;opacity:.7}
-.xphd #xpBig{font-size:10px;padding:2px 7px;border-radius:4px;color:var(--dim);margin-left:auto}
-.xphd #xpBig:hover{color:var(--gold);border-color:var(--gold)}
+#lvTable .note{width:100%;font-family:inherit;opacity:.75;white-space:normal;line-height:1.6}
 
-/* ---- 우측: 경험치 그래프 + 이벤트 로그 ---- */
-#xpBox{flex:none;display:flex;flex-direction:column;gap:3px;padding:0 10px 8px}
-.xphd{display:flex;align-items:center;justify-content:space-between;gap:6px;
-  font-size:10px;color:var(--dim);letter-spacing:.06em}
-.xphd select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
-  border-radius:4px;font:inherit;font-size:10px;padding:2px 4px;cursor:pointer}
-#gXp{width:100%;height:118px;background:#11151d;border:1px solid var(--line);border-radius:5px}
-#xpLegend{display:flex;gap:10px;font-size:10px;color:var(--dim);flex-wrap:wrap}
-#xpLegend b{font-family:var(--mono)}
-#side.collapsed #xpBox{display:none}
+/* ---- 우측 레일 (이벤트 로그 · 지표 그래프) ---- */
+#side{width:26rem;flex:none;display:flex;flex-direction:column;gap:8px;
+  min-height:0;overflow:hidden;transition:width .15s}
+#side .rail{display:flex;flex-direction:column;min-height:0;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);overflow:hidden}
+#side .rail.log{flex:2 1 0;min-height:0}
+#side .rail.xp{flex:1 1 0;min-height:0}
+.panhd{flex:none;display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;
+  border-bottom:1px solid var(--line);font-size:10px;font-weight:600;color:var(--gold-dim)}
+.panhd .lbl{white-space:nowrap}
+.panhd .cnt{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.panhd select{margin-left:auto;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+  border-radius:4px;font:inherit;font-size:11px;padding:2px 5px;cursor:pointer;font-weight:400}
+.panhd button{font-size:11px;padding:2px 7px;border-radius:4px;color:var(--dim);flex:none}
+.panhd button:hover{color:var(--gold);border-color:var(--gold-dim)}
+#gXp{flex:1;min-height:56px;width:100%;height:124px;
+  background:color-mix(in oklab,var(--bg) 60%,transparent);cursor:crosshair}
+#xpLegend{flex:none;display:flex;gap:10px;font-size:10px;color:var(--dim);flex-wrap:wrap;
+  padding:5px 10px 3px;max-height:44px;overflow:hidden}
+#xpLegend b{font-family:var(--mono);color:var(--ink)}
+#side.collapsed{width:34px;min-width:34px}
+#side.collapsed .rail.xp,#side.collapsed #filters,#side.collapsed #log,
+#side.collapsed .panhd .lbl,#side.collapsed .panhd .cnt{display:none}
+#side.collapsed .panhd{padding:0 4px;justify-content:center}
 
-/* ---- 경기 전체 이벤트 타임라인 (하단) ---- */
-#timeline{flex:none;display:none;flex-direction:column;gap:1px;
-  background:var(--panel);border:1px solid var(--line);border-radius:6px;
-  padding:4px 8px 2px;position:relative;user-select:none}
+/* ---- 하단 이벤트 타임라인 ---- */
+#timeline{flex:none;display:none;flex-direction:column;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
 body.mode-replay.has-replay #timeline{display:flex}
-.tlrow{display:flex;align-items:center;gap:6px;height:18px}
+#timeline .tlwrap{position:relative;padding:0 10px 6px;display:flex;flex-direction:column;gap:1px;
+  user-select:none}
+.tlrow{display:flex;align-items:center;gap:6px;height:20px}
 .tlrow .tag{flex:none;width:26px;font-size:9px;letter-spacing:.05em}
 .tlrow.t0 .tag{color:var(--blue)} .tlrow.t1 .tag{color:var(--red)}
-.tlrow .track{position:relative;flex:1;height:100%;background:#11151d;
-  border:1px solid var(--line);border-radius:3px;cursor:pointer;overflow:hidden}
-.tlrow.t0 .track{border-bottom-color:#2b3d5e}
-.tlrow.t1 .track{border-top-color:#4a2b33}
-.tlmark{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:11px;
-  line-height:1;cursor:pointer;text-shadow:0 1px 2px #000;pointer-events:auto}
-.tlmark:hover{transform:translate(-50%,-50%) scale(1.45);z-index:3}
-.tlaxis{position:relative;height:12px;margin-left:32px;cursor:pointer}
+.tlrow .track{position:relative;flex:1;height:100%;cursor:pointer;overflow:visible;
+  background:color-mix(in oklab,var(--bg) 60%,transparent);
+  border:1px solid var(--line);border-radius:3px}
+/* 지나간 구간을 옅은 금색으로 채운다 (레퍼런스의 progress fill) */
+.tlrow .track::before{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--prog,0%);
+  background:var(--gold-soft);pointer-events:none}
+/* 마커 — 팀 색 원, 크기는 사건의 무게, 아직 오지 않은 것은 옅게 */
+.tlmark{position:absolute;top:50%;transform:translate(-50%,-50%);
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid;border-radius:50%;cursor:pointer;padding:0;
+  font-size:8px;line-height:1;transition:transform .1s,box-shadow .1s}
+.tlmark.future{opacity:.38}
+.tlmark:hover{transform:translate(-50%,-50%) scale(1.5);z-index:4}
+.tlmark.sel{box-shadow:0 0 0 2px var(--gold);z-index:3}
+.tlrow.t0 .tlmark{border-color:var(--blue);background:color-mix(in oklab,var(--blue) 30%,transparent)}
+.tlrow.t1 .tlmark{border-color:var(--red);background:color-mix(in oklab,var(--red) 30%,transparent)}
+.tlaxis{position:relative;height:13px;margin-left:32px;cursor:pointer}
 .tlaxis span{position:absolute;top:0;transform:translateX(-50%);
   font-family:var(--mono);font-size:9px;color:var(--dim)}
-.tlaxis span::before{content:'';position:absolute;left:50%;top:-2px;width:1px;height:4px;background:var(--line)}
-.tlnow{position:absolute;top:4px;bottom:4px;width:2px;background:var(--gold);
-  pointer-events:none;box-shadow:0 0 6px rgba(232,182,76,.7);margin-left:0}
-.tlkey{display:none}
+.tlaxis span::before{content:'';position:absolute;left:50%;top:-2px;width:1px;height:4px;background:var(--line2)}
+/* 재생 헤드 — 위에 마름모 */
+.tlnow{position:absolute;top:2px;bottom:8px;width:1px;background:var(--gold);
+  pointer-events:none;margin-left:0}
+.tlnow::before{content:'';position:absolute;top:-3px;left:-3px;width:7px;height:7px;
+  background:var(--gold);transform:rotate(45deg)}
 
-@media (max-width:860px){
-  .pl{max-width:none} .pl .nm{display:none}
-}
-@media (max-width:640px){
-  #topbar{gap:4px;padding:4px 5px}
-  #topbar .tcenter{min-width:150px;padding:0 4px}
-  #topbar .clockbig{font-size:15px;padding:1px 6px}
-  #topbar .lv{font-size:20px} #topbar .sc{min-width:48px} #topbar .score{gap:8px}
-  #topbar .kb{font-size:9px} #topbar .kb b{font-size:11px}
-  .pl .col{display:none}
-  .pl{max-width:56px;justify-content:center}
-}
+/* ---- 재생 조작 막대 (타임라인 머리) ---- */
+#controls{flex:none;display:flex;align-items:center;gap:8px;height:38px;padding:0 10px;
+  border-bottom:1px solid var(--line)}
+#controls #play{font-size:12px;padding:4px 12px;border-radius:5px;color:var(--gold);
+  border-color:var(--gold-dim);background:var(--gold-soft)}
+#controls #clock{font-family:var(--mono);font-size:14px;color:var(--gold);
+  font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:5px}
+#controls #clock small{font-size:9px;color:var(--dim);font-family:inherit}
+#controls #seek{flex:1;min-width:80px}
+#controls .spd{font-family:var(--mono);font-size:10px;padding:3px 7px;border-radius:4px;color:var(--dim)}
+#controls .spd.on{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-soft)}
+#controls .evnav{font-size:12px;padding:3px 8px;border-radius:4px;color:var(--dim)}
+#controls .evnav:hover{color:var(--gold);border-color:var(--gold-dim)}
 
-header{flex:none;display:flex;align-items:center;gap:14px;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-header h1{font-size:15px;font-weight:700;letter-spacing:.06em}
-header .map-name{color:var(--gold);font-size:13px}
-header .teams{font-size:12px;color:var(--dim)}
-header .teams b.b{color:var(--blue)} header .teams b.r{color:var(--red)}
-header .hgroup{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-header label.load{font-size:11px;color:var(--dim);border:1px solid var(--line);padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap}
-header label.load:hover{color:var(--ink);border-color:var(--dim)}
-header input[type=file]{display:none}
-header select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:4px;
-  font:inherit;font-size:11px;padding:4px 6px;cursor:pointer;max-width:170px}
-header select:hover{border-color:var(--dim)}
-main{flex:1;display:flex;min-height:0}
-#mapwrap{flex:1;display:flex;flex-direction:column;min-width:0;padding:10px 12px;gap:8px}
 /* ---- 팬줌 스테이지 ---- */
 #stage{flex:1;position:relative;min-height:0;overflow:hidden;border:1px solid var(--line);
   border-radius:6px;background:radial-gradient(ellipse at 50% 45%, #131a26 0%, #0d1119 75%);
@@ -268,41 +371,25 @@ body.objmove .obj{cursor:grab;pointer-events:auto}
 .imgobj.sel{outline:3px solid var(--gold)}
 .pinw.sel .pinb,.pinw.sel .ph-c{box-shadow:0 0 0 3px var(--gold)}
 .mark.sel{box-shadow:0 0 0 3px var(--gold)}
-/* ---- 컨트롤 ---- */
-#controls{display:flex;align-items:center;gap:10px}
+/* ---- 공용 단추 ---- */
 button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:4px;
   font-family:var(--mono);font-size:12px;padding:6px 12px;cursor:pointer;white-space:nowrap}
 button:hover{border-color:var(--dim)}
 button:focus-visible{outline:2px solid var(--gold)}
-#play{width:74px;font-weight:700}
-.spd{padding:6px 8px;color:var(--dim)}
-.spd.on{color:var(--gold);border-color:var(--gold)}
-#clock{font-family:var(--mono);font-size:17px;min-width:112px;text-align:center;letter-spacing:.05em}
-#clock small{color:var(--dim);font-size:10px;display:block}
-#seek{flex:1;appearance:none;height:4px;background:var(--line);border-radius:2px;cursor:pointer}
-#seek::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:var(--gold);border:2px solid var(--bg)}
-#calbar{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);flex-wrap:wrap}
+#seek{appearance:none;height:4px;background:var(--line2);border-radius:2px;cursor:pointer}
+#seek::-webkit-slider-thumb{appearance:none;width:13px;height:13px;border-radius:50%;
+  background:var(--gold);border:2px solid var(--bg)}
+#calbar{flex:none;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);flex-wrap:wrap}
 #calbar input[type=number]{width:58px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
   border-radius:3px;padding:3px 5px;font-family:var(--mono);font-size:11px}
 #calbar .sep2{width:1px;height:14px;background:var(--line)}
 #calbar .cl{color:var(--dim)}
 #calbar label{cursor:pointer;color:var(--ink)}
 /* ---- 로그 ---- */
-#side{width:330px;border-left:1px solid var(--line);display:flex;flex-direction:column;background:var(--panel);transition:width .15s}
-#side h2{font-size:11px;letter-spacing:.15em;color:var(--dim);padding:10px 14px 8px;font-weight:600;
-  display:flex;align-items:center;gap:8px}
-#sideTgl{font-size:11px;padding:2px 7px;border-radius:4px;flex:none}
-#side.collapsed{width:36px;min-width:36px}
-#side.collapsed #filters,#side.collapsed #log,#side.collapsed h2 .lbl{display:none}
-#side.collapsed h2{padding:10px 4px;justify-content:center}
+#sideTgl{font-size:11px;padding:2px 6px;border-radius:4px;flex:none}
 /* 이름 옆 영웅 아이콘 */
-header .hp{display:inline-flex;align-items:center;gap:3px;margin-right:5px;
   flex:none;white-space:nowrap}
-header .teams>b{flex:none;white-space:nowrap}
-header .hp img{width:16px;height:16px;border-radius:50%;border:1px solid var(--line)}
 .ev img.li{width:14px;height:14px;border-radius:50%;vertical-align:-3px;margin-right:2px}
-header select:disabled{opacity:.45;cursor:default}
-header .dim{color:var(--dim)}
 button.mini{font-size:11px;padding:4px 9px;font-family:inherit;color:var(--dim)}
 button.mini:hover{color:var(--ink)}
 
@@ -316,29 +403,37 @@ body.mode-map #repLoadLabel,
 body.mode-map #repToggles{display:none}
 body:not(.has-replay) #snapBoard{display:none}
 body.mode-replay #bgLabel,
+body.mode-replay.has-replay #mapName,
 body.mode-replay #calGroup{display:none}
 #closeRep{display:none}
 body.mode-replay.has-replay #closeRep{display:inline-block}
 /* 리플레이 보기인데 아직 연 리플레이가 없을 때 안내 */
 #needRep{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;
   display:none;text-align:center;color:var(--dim);font-size:13px;line-height:1.8;pointer-events:none;
-  background:rgba(14,18,25,.86);border:1px solid var(--line);border-radius:8px;padding:16px 26px}
+  background:color-mix(in oklab,var(--bg) 88%,transparent);border:1px solid var(--line2);
+  border-radius:8px;padding:16px 26px}
 body.mode-replay:not(.has-replay) #needRep{display:block}
 #needRep b{color:var(--ink);display:block;font-size:15px;margin-bottom:6px}
-#filters{display:flex;gap:6px;padding:0 14px 10px;flex-wrap:wrap}
-#filters button{font-size:10px;padding:3px 8px;border-radius:10px;color:var(--dim)}
-#filters button.on{color:var(--ink);border-color:var(--gold)}
-#log{flex:1;overflow-y:auto;padding:0 8px 12px;font-size:12px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-.ev{display:flex;gap:8px;padding:5px 6px;border-radius:4px;line-height:1.45;align-items:baseline}
-.ev:nth-child(even){background:rgba(255,255,255,.02)}
-.ev.fresh{background:rgba(232,182,76,.12)}
-.ev .t{font-family:var(--mono);color:var(--dim);font-size:11px;flex:none;width:44px}
-.ev .ic{flex:none}
+#filters{flex:none;display:flex;gap:4px;padding:5px 8px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line)}
+#filters button{font-size:10px;padding:2px 7px;border-radius:4px;color:var(--dim);font-family:inherit}
+#filters button.on{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-soft)}
+#log{flex:1;min-height:0;overflow-y:auto;font-size:12px;
+  scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.ev{display:flex;gap:7px;padding:5px 10px;line-height:1.45;align-items:baseline;
+  border-bottom:1px solid color-mix(in oklab,var(--line) 50%,transparent)}
+.ev:hover{background:var(--accent)}
+.ev.fresh{background:var(--gold-soft)}
+.ev .t{font-family:var(--mono);color:var(--dim);font-size:10px;flex:none;width:38px;
+  font-variant-numeric:tabular-nums}
+.ev .ic{flex:none;font-size:11px}
 .ev .b{color:var(--blue)} .ev .r{color:var(--red)} .ev .g{color:var(--gold)} .ev .dim{color:var(--dim)}
-#log .empty{color:var(--dim);text-align:center;padding:30px 10px;font-size:12px}
-@media (max-width:860px){ main{flex-direction:column}
-  #side{width:100%;height:34%;border-left:none;border-top:1px solid var(--line)}
-  #side.collapsed{width:100%;min-width:0;height:38px} }
+#log .empty{color:var(--dim);text-align:center;padding:30px 10px;font-size:11px}
+@media (max-width:1100px){ #side{width:20rem} }
+@media (max-width:860px){ #mid{flex-direction:column}
+  #side{width:100%;height:36%;flex-direction:row}
+  #side .rail.log,#side .rail.xp{flex:1}
+  #side.collapsed{width:100%;min-width:0;height:34px} }
 
 /* 좁은 화면에서는 지도에 자리를 몰아준다. 팀 명단은 한 줄로 옆으로 넘기고,
    배경 정렬 숫자칸은 감춘다 (내장 전장은 자동 정렬이라 손댈 일이 없다). */

@@ -1,10 +1,12 @@
-/* ================= 상단 스코어보드 (게임 화면처럼) =================
-   좌 1팀 5명 · 가운데 시간/팀레벨/킬/건물 · 우 2팀 5명.
-   선수 한 명 = 초상화(레벨·생사) + 특성 7칸 + 스킬 사용 표시.
-   (특성 내부명은 TALENT_DB 로 한국어·아이콘을 붙인다) */
+/* ================= 스코어보드 =================
+   reference/heroes-of-the-storm-analyzer 의 TeamPanel / ScoreColumn 배치를 옮겼다.
+     [1팀 선수 5줄] [가운데 점수 기둥] [2팀 선수 5줄]
+   선수 한 줄 = 초상화 + 영웅/닉네임 + 특성 7칸 + 스킬 사용 + 수치 칸.
+   수치 칸은 가운데 «특성/관여/APM/XP» 단추로 갈아 끼운다. */
 const TIERS = [1,4,7,10,13,16,20];
 const teamEls = [document.getElementById('top0'), document.getElementById('top1')];
 let plCards = [];
+let selPlayer = null;              // 선수 한 명을 고르면 그 줄이 금색으로 강조된다
 
 function talentInfo(name){
   const d = (typeof TALENT_DB!=='undefined') ? TALENT_DB[name] : null;
@@ -27,7 +29,7 @@ const SHARED_ABIL = new Set([22,23,26,41,45,66,77,110,111,115,172,788,789,796,13
 const SK_SLOTS = 5;
 
 function buildTeamBar(){
-  plCards = [];
+  plCards = []; selPlayer = null;
   teamEls.forEach(el=>el.replaceChildren());
   if(!G) return;
   const picks = {}, levels = {};
@@ -42,77 +44,100 @@ function buildTeamBar(){
   for(const k in picks) picks[k].sort((a,b)=>a.t-b.t);
   for(const k in levels) levels[k].sort((a,b)=>a.t-b.t);
 
+  // 특성 레벨 머리줄 (1 4 7 10 13 16 20)
+  for(let i=0;i<2;i++){
+    const h=document.createElement('div'); h.className='tlhead';
+    h.appendChild(Object.assign(document.createElement('span'),{className:'who'}));
+    for(const lv of TIERS){
+      const s=document.createElement('span'); s.className='tl'; s.textContent=lv; h.appendChild(s);
+    }
+    const kh=document.createElement('span'); kh.className='kh'; kh.id='kh'+i; kh.textContent='특성';
+    h.appendChild(kh);
+    teamEls[i].appendChild(h);
+  }
+
   for(const lab in G.heroes){
     const hh = G.heroes[lab];
     const team = hh.team===1 ? 1 : 0;
     const hd = heroByName(hh.heroName);
-    const card = document.createElement('div');
-    card.className = 'pl ' + (team===0?'b':'r');
-    card.title = lab;
+    const row = document.createElement('div');
+    row.className = 'pl';
 
-    const por = document.createElement('div'); por.className='por';
+    // 초상화 + 이름 (누르면 그 선수를 강조)
+    const who = document.createElement('button');
+    who.type='button'; who.className='who'; who.title=lab;
+    const por = document.createElement('span'); por.className='por';
     if(hd){ const im=document.createElement('img'); im.src='icons/'+hd.icon; im.alt=hh.heroName; por.appendChild(im); }
-    card.appendChild(por);
-
-    const col = document.createElement('div'); col.className='col';
-    const nm = document.createElement('span'); nm.className='nm'; nm.textContent=hh.heroName;
-    col.appendChild(nm);
+    who.appendChild(por);
+    const nc = document.createElement('span'); nc.className='nmcol';
+    const hn = document.createElement('span'); hn.className='hero'; hn.textContent=hh.heroName;
+    const un = document.createElement('span'); un.className='user';
+    un.textContent = lab.replace(/\(.*\)$/,'').trim() || lab;
+    nc.append(hn,un); who.appendChild(nc);
+    row.appendChild(who);
 
     // 특성 7칸
-    const tal = document.createElement('div'); tal.className='tal';
     const list = picks[lab] || [], pips = [], byTier = {}, rest = [];
     for(const p of list){ if(p.lv && !byTier[p.lv]) byTier[p.lv]=p; else rest.push(p); }
     for(const tier of TIERS){
       const i = document.createElement('i');
+      i.className='tcell';
       const p = byTier[tier] || rest.shift();
       if(p){
         i.dataset.t=p.t; i.title=`${tier} 레벨 · ${p.ko}`;
         if(p.ic){ const im=document.createElement('img'); im.src='talents/'+p.ic+'.webp'; im.alt=p.ko; i.appendChild(im); }
         else i.classList.add('noic');
-      }else i.title=`${tier} 레벨`;
-      tal.appendChild(i); pips.push(i);
+      }else i.title=`${tier} 레벨 · (안 찍음)`;
+      row.appendChild(i); pips.push(i);
     }
-    col.appendChild(tal);
 
     // 스킬 사용 — 이 영웅이 쓴 «고유 스킬 번호»를 처음 쓴 순서로 칸에 배정하고,
     // 그 스킬을 방금 썼으면 칸에 불이 들어온다. (번호가 Q/W/E/R 중 무엇인지는
-    // 리플레이만으로 알 수 없어 «슬롯»으로만 보여준다)
+    // 리플레이만으로 알 수 없어 «슬롯»으로만 보여 준다)
     const casts = (hh.pts||[]).filter(p=>p.src==='a' && p.link!=null && !SHARED_ABIL.has(p.link));
     const order = [];
     for(const c of casts) if(!order.includes(c.link) && order.length<SK_SLOTS) order.push(c.link);
-    const sk = document.createElement('div'); sk.className='sk';
+    const sk = document.createElement('span'); sk.className='sk';
     const slots = order.map((lk,i)=>{
       const u=document.createElement('u');
       u.title=`스킬 ${i+1} (번호 ${lk}) · ${casts.filter(c=>c.link===lk).length}회 사용`;
       sk.appendChild(u); return {el:u, link:lk};
     });
-    col.appendChild(sk);
-    // 통계 줄 — 페이지(특성/KDA/APM/XP)에 따라 내용이 바뀐다
-    const stat=document.createElement('div'); stat.className='stat';
-    col.appendChild(stat);
-    card.appendChild(col);
+    row.appendChild(sk);
 
-    teamEls[team].appendChild(card);
-    plCards.push({lab, card, pips, hh, slots, tal, stat, lv:1,
+    // 수치 칸
+    const kda=document.createElement('span'); kda.className='kda';
+    row.appendChild(kda);
+
+    teamEls[team].appendChild(row);
+    const card = {lab, card:row, pips, hh, slots, kda, lv:1,
                   casts: casts.map(c=>({t:c.t, link:c.link})),
-                  levels: levels[lab]||[]});
+                  levels: levels[lab]||[]};
+    who.onclick = ()=>{ selPlayer = (selPlayer===lab) ? null : lab; applySel(); };
+    plCards.push(card);
   }
+  applySel();
   applyPage();
+}
+function applySel(){
+  for(const c of plCards) c.card.classList.toggle('sel', c.lab===selPlayer);
 }
 
 /* --- 통계 페이지 (참고: SpazzoReplayStatKit 의 Control+1~6 방식) --- */
 let statPage='tal';
 const pageTabs=document.getElementById('pageTabs');
+const PAGE_KO={tal:'특성', kda:'관여', apm:'APM', xp:'XP'};
 pageTabs.querySelectorAll('button').forEach(b=>b.onclick=()=>{
   statPage=b.dataset.p;
   pageTabs.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
   applyPage(); updateTeamBar();
 });
 function applyPage(){
-  for(const c of plCards){
-    c.tal.style.display = statPage==='tal' ? 'flex' : 'none';
-    c.stat.style.display = statPage==='tal' ? 'none' : 'flex';
+  for(let i=0;i<2;i++){
+    const kh=document.getElementById('kh'+i);
+    if(kh) kh.textContent = PAGE_KO[statPage] || '';
   }
+  fillStats();
 }
 /* 지금 시각까지의 선수별 «처치 관여 / 데스».
    리플레이의 KillingPlayer 는 «관여자 목록»이라 누가 막타인지는 알 수 없다.
@@ -135,7 +160,7 @@ function deadSecs(hh){
   let n=0; for(let k=0;k<=last;k++) if(P.fl[k]===2) n++;
   return Math.round(n*PDT);
 }
-/* 지금 시각 기준 갱신 — 레벨·생사·특성·스킬 사용 */
+/* 지금 시각 기준 갱신 — 생사·특성·스킬 사용 */
 function updateTeamBar(){
   if(!G || !plCards.length) return;
   const CAST_HOLD = 1.2;                  // 스킬 표시를 켜 두는 시간(초)
@@ -154,7 +179,7 @@ function updateTeamBar(){
     let lv=1;
     if(c.levels.length){ for(const L of c.levels){ if(L.t<=tCur) lv=L.lv; else break; } }
     else if(got) lv=TIERS[got-1];
-    c.lv=lv;                       // 초상화에 겹쳐 쓰지 않는다 — 팀 레벨은 가운데에 크게 있다
+    c.lv=lv;
     c.card.title = `${c.lab} · 레벨 ${lv}`;
     // 최근에 쓴 스킬
     const hot=new Set();
@@ -166,41 +191,54 @@ function updateTeamBar(){
     const casting = hot.size>0;
     if(c.card.classList.contains('cast')!==casting) c.card.classList.toggle('cast',casting);
   }
-  if(statPage!=='tal') fillStats();
+  fillStats();
   updateScore();
 }
 
-/* 페이지별 통계 채우기 */
+/* 수치 칸 채우기 — 페이지에 따라 내용이 바뀐다 */
 function fillStats(){
+  if(!G || !plCards.length) return;
   const kda = statPage==='kda' ? kdaAt() : null;
   const min = Math.max(1, Math.floor(tCur/60));
   for(const c of plCards){
     let h='';
-    if(statPage==='kda'){
+    if(statPage==='tal'){
+      // 특성 페이지에서는 지금 레벨만 조용히 보여 준다
+      h=`<b>${c.lv}</b><em>레벨</em>`;
+    }else if(statPage==='kda'){
       const v=kda[c.lab]||{td:0,d:0};
-      h=`<s class="k">${v.td}</s>관여 <s class="d">${v.d}</s>데스`;
+      h=`<b><s class="k">${v.td}</s> / <s class="d">${v.d}</s></b><em>관여/데스</em>`;
     }else if(statPage==='apm'){
-      // 지금까지의 평균 APM (분당 명령 수) + 죽어 있던 시간
       const b=(G.apm||{})[c.lab]||{};
       let tot=0; for(const m in b){ if(+m<min) tot+=b[m]; }
       const dead=deadSecs(c.hh);
-      h=`<s>${Math.round(tot/min)}</s>apm <s class="d">${Math.floor(dead/60)}:${String(dead%60).padStart(2,'0')}</s>사망`;
+      h=`<b>${Math.round(tot/min)}</b><em>apm · ${Math.floor(dead/60)}:${String(dead%60).padStart(2,'0')}</em>`;
     }else if(statPage==='xp'){
       const x=(G.xpEnd||{})[c.lab];
-      h = x ? `<s>${Math.round(x/1000)}k</s>경험치` : '<s>-</s>';
+      h = x ? `<b>${(x/1000).toFixed(1)}k</b><em>경험치</em>` : '<b>-</b>';
     }
-    if(c.stat.innerHTML!==h) c.stat.innerHTML=h;
+    if(c.kda.innerHTML!==h) c.kda.innerHTML=h;
   }
 }
 
-/* 가운데: 시간 · 팀 레벨 · 킬 · 건물 */
+/* 가운데 점수 기둥 + 접었을 때의 한 줄 요약 */
 const tClock=document.getElementById('tClock');
+const tClockSub=document.getElementById('tClockSub');
 const tLv=[document.getElementById('tLv0'),document.getElementById('tLv1')];
 const tK=[document.getElementById('tK0'),document.getElementById('tK1')];
 const tS=[document.getElementById('tS0'),document.getElementById('tS1')];
+const bdMini=document.getElementById('bdMini');
+/* 앞서는 쪽만 팀 색으로 켠다 (레퍼런스의 StatRow lead 표시) */
+function setPair(els, v){
+  for(let i=0;i<2;i++){
+    if(els[i].textContent!==String(v[i])) els[i].textContent=v[i];
+    els[i].classList.toggle('lead', v[i]>v[1-i]);
+  }
+}
 function updateScore(){
   if(!G) return;
   tClock.textContent = fmtT(tCur);
+  tClockSub.textContent = '/ ' + fmtT(G.maxT||0);
   // 팀 레벨은 경험치 표본이 정확하다. 없으면 선수 최고 레벨로 어림한다.
   const lv=[1,1];
   for(const r of (G.teamXp||[])) if(r.t<=tCur) lv[r.team]=r.lv;
@@ -216,19 +254,36 @@ function updateScore(){
     // 화면의 표식 개수와 숫자가 어긋나 보인다
     else if(cat==='struct' && (typeof structKind!=='function' || structKind(e.UnitType||e.unit).big)) s[tm]++;
   }
+  setPair(tLv,lv); setPair(tK,k); setPair(tS,s);
   // 다음 레벨까지 남은 경험치 (문턱값은 표본에서 뽑은 추정치라 «약» 이다)
   const cur=[null,null];
   for(const r of (G.teamXp||[])) if(r.t<=tCur) cur[r.team]=r;
   for(let i=0;i<2;i++){
-    if(tLv[i].textContent!==String(lv[i])) tLv[i].textContent=lv[i];
     const need = (typeof lvXp==='function') ? lvXp(lv[i]+1) : null;
     const now = cur[i] ? cur[i].minion+cur[i].creep+cur[i].hero+cur[i].struct+cur[i].trickle : null;
     tLv[i].title = (need!=null && now!=null)
-      ? `${i+1}팀 레벨 ${lv[i]} · 경험치 ${Math.round(now).toLocaleString()}
-`
-        +`레벨 ${lv[i]+1} 까지 약 ${Math.max(0,Math.round(need-now)).toLocaleString()} (문턱 약 ${need.toLocaleString()})`
+      ? `${i+1}팀 레벨 ${lv[i]} · 경험치 ${Math.round(now).toLocaleString()}\n`
+        +`레벨 ${lv[i]+1} 까지 약 ${Math.max(0,Math.round(need-now)).toLocaleString()} (문턱 약 ${need.toLocaleString()}+)`
       : `${i+1}팀 레벨 ${lv[i]}`;
-    if(tK[i].textContent!==String(k[i])) tK[i].textContent=k[i];
-    if(tS[i].textContent!==String(s[i])) tS[i].textContent=s[i];
   }
+  // 접었을 때 쓰는 한 줄 요약
+  bdMini.innerHTML =
+    `<b class="b">${lv[0]}</b><i>렙</i><b class="b">${k[0]}</b><i>킬</i><b class="b">${s[0]}</b><i>건물</i>`+
+    `<span class="cl">${fmtT(tCur)}</span>`+
+    `<b class="r">${s[1]}</b><i>건물</i><b class="r">${k[1]}</b><i>킬</i><b class="r">${lv[1]}</b><i>렙</i>`;
 }
+
+/* ---- 스코어보드 접기: 펼침 → 한 줄 → 숨김 → 펼침 ---- */
+const boardEl=document.getElementById('board');
+const bdTgl=document.getElementById('bdTgl');
+let boardState=0;                          // 0 펼침 · 1 한 줄 · 2 숨김
+function setBoardState(s){
+  boardState=(s+3)%3;
+  boardEl.classList.toggle('mini', boardState===1);
+  document.body.classList.toggle('board-off', boardState===2);
+  bdTgl.textContent = boardState===0 ? '⌄' : '⌃';
+  bdTgl.title = ['스코어보드 한 줄로 (Tab)','스코어보드 숨기기 (Tab)','스코어보드 펼치기 (Tab)'][boardState];
+  // 스테이지 크기가 바뀌었으니 오버레이를 다시 맞춘다
+  requestAnimationFrame(()=>{ resizeOverlay(); if(typeof drawXp==='function') drawXp(); });
+}
+bdTgl.onclick=()=>setBoardState(boardState+1);

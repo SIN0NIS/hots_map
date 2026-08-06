@@ -12,6 +12,8 @@ let tCur = 0, playing = false, speed = 4, lastTs = 0;
 let bgImg = null, bgAlpha = 0.7, showStruct = true, showHeroIcons = true;
 let cal = null;
 const R = 2;                     // 월드 좌표계 기준 배율 (예전 캔버스 배율을 그대로 씀)
+/* 캔버스는 CSS 변수를 읽지 못한다. css/style.css 의 토큰과 같은 색을 hex 로 적어 둔다
+   (--blue #339fee · --red #e64343 · --gold #d8b260 · --green #4dbc92 · --bg #06101c) */
 let HERO_R = 27;                 // 영웅 아이콘 반지름 (화면 CSS px). 하단 슬라이더로 조절
 
 const stage=document.getElementById('stage'), world=document.getElementById('world');
@@ -99,21 +101,21 @@ function draw(){
       const [px,py]=S(s.x,s.y), dead = s.deathT<=tCur;
       const R=2*ws;
       ctx.globalAlpha = dead? .25 : .85;
-      if(/Core|King/.test(s.unit)){ ctx.fillStyle='#e8b64c';
+      if(/Core|King/.test(s.unit)){ ctx.fillStyle='#d8b260';
         ctx.beginPath();ctx.arc(px,py,7*R,0,7);ctx.fill();
-        ctx.strokeStyle='#0e1219';ctx.lineWidth=2*R;ctx.stroke(); }
+        ctx.strokeStyle='#06101c';ctx.lineWidth=2*R;ctx.stroke(); }
       else if(/TownHall/.test(s.unit)){ ctx.fillStyle='#b9a7e0';
         ctx.fillRect(px-5*R,py-5*R,10*R,10*R); }
       else if(/CannonTower/.test(s.unit)){ ctx.fillStyle='#8fa3c8';
         ctx.fillRect(px-2.5*R,py-2.5*R,5*R,5*R); }
-      else if(/Moonwell/.test(s.unit)){ ctx.strokeStyle='#5ad19a';ctx.lineWidth=1.5*R;
+      else if(/Moonwell/.test(s.unit)){ ctx.strokeStyle='#4dbc92';ctx.lineWidth=1.5*R;
         ctx.beginPath();ctx.arc(px,py,3.5*R,0,7);ctx.stroke(); }
-      else if(/MercCamp/.test(s.unit)){ ctx.fillStyle='#e8b64c';
+      else if(/MercCamp/.test(s.unit)){ ctx.fillStyle='#d8b260';
         ctx.save();ctx.translate(px,py);ctx.rotate(Math.PI/4);
         ctx.fillRect(-3*R,-3*R,6*R,6*R);ctx.restore(); }
       else { ctx.fillStyle='rgba(140,155,185,.5)';
         ctx.fillRect(px-1.5*R,py-1.5*R,3*R,3*R); }
-      if(dead){ ctx.globalAlpha=.6; ctx.strokeStyle='#ff5f6d'; ctx.lineWidth=1.5*R;
+      if(dead){ ctx.globalAlpha=.6; ctx.strokeStyle='#e64343'; ctx.lineWidth=1.5*R;
         ctx.beginPath();ctx.moveTo(px-4*R,py-4*R);ctx.lineTo(px+4*R,py+4*R);
         ctx.moveTo(px+4*R,py-4*R);ctx.lineTo(px-4*R,py+4*R);ctx.stroke(); }
       ctx.globalAlpha=1;
@@ -135,7 +137,7 @@ function draw(){
   }
   // 영웅 — 화면상 크기가 늘 일정하도록 ss(=DPR)만 곱한다
   for(const lab in G.heroes){
-    const hh=G.heroes[lab], col = hh.team===0?'#4da3ff':'#ff5f6d';
+    const hh=G.heroes[lab], col = hh.team===0?'#339fee':'#e64343';
     for(let k=8;k>=1;k--){
       const p=posAt(hh,tCur-k*0.5); if(!p||p.dead) continue;
       const [px,py]=S(p.x,p.y);
@@ -156,7 +158,7 @@ function draw(){
       ctx.drawImage(img, px-r, py-r, r*2, r*2);
       ctx.restore();
       ctx.beginPath(); ctx.arc(px,py,r,0,7);
-      ctx.lineWidth=6.6*ss; ctx.strokeStyle=p.dead?'#7d8aa5':col; ctx.stroke();
+      ctx.lineWidth=6.6*ss; ctx.strokeStyle=p.dead?'#93a0ae':col; ctx.stroke();
       ctx.beginPath(); ctx.arc(px,py,r+3.3*ss,0,7);
       ctx.lineWidth=3*ss; ctx.strokeStyle='rgba(10,14,22,.9)'; ctx.stroke();
     }else{

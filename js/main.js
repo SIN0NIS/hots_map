@@ -5,23 +5,19 @@
    'replay' 리플레이를 재생한다. 리플레이의 전장으로 배경을 되돌린다. */
 let uiMode='map';
 let repSlug=null;                 // 지금 열린 리플레이의 전장 (맵 보기에서 딴 맵을 봐도 기억)
-let rosterHTML='';                // 리플레이 보기에서 보여줄 팀 명단
 function setUIMode(m){
   uiMode=m;
   document.body.classList.toggle('mode-map', m==='map');
   document.body.classList.toggle('mode-replay', m==='replay');
   document.querySelectorAll('#modebar .tab').forEach(b=>
     b.classList.toggle('on', b.dataset.mode===m));
-  const ti=document.getElementById('teamInfo');
   if(m==='replay'){
     // 맵 보기에서 다른 전장을 구경했다면 리플레이의 전장으로 되돌린다
     if(G && repSlug && repSlug!==curMapSlug) loadMapBySlug(repSlug);
     setMapLock(!!(G && repSlug));
-    ti.innerHTML = rosterHTML || '';
   }else{
     playing=false; playBtn.textContent='▶ 재생';
     setMapLock(false);                       // 맵 보기에서는 전장을 자유롭게 고른다
-    setTeamHint();                           // 팀 명단은 리플레이 보기에서만
   }
   logCount=-1; markDirty();
   // 패널이 접혔다 펴지므로 오버레이 크기와 화면 맞춤을 다시 잡는다
@@ -93,12 +89,6 @@ function load(raw){
   document.getElementById('mapName').textContent=raw.map||'';
   const t0=[],t1=[];
   for(const k in raw.players){const p=raw.players[k];(p.team===0?t0:t1).push(p);}
-  const chip=p=>{
-    const hd=heroByName(p.hero);
-    return `<span class="hp" title="${p.name}">${hd?`<img src="icons/${hd.icon}" alt="">`:''}${p.hero}</span>`;
-  };
-  rosterHTML=`<b class="b">1팀</b> ${t0.map(chip).join('')} <span style="opacity:.5">vs</span> <b class="r">2팀</b> ${t1.map(chip).join('')}`;
-  document.getElementById('teamInfo').innerHTML=rosterHTML;
   // 영웅 미니맵 아이콘 준비 (이름 -> 내장 아이콘)
   for(const lab in G.heroes){
     const h=G.heroes[lab], hd=heroByName(h.heroName);
@@ -122,7 +112,8 @@ function load(raw){
     syncCalInputs();
   }
   document.body.classList.add('has-replay');
-  buildTeamBar(); buildTimeline();
+  buildTeamBar(); buildTimeline();      // buildTimeline 이 구조물 주인을 정한다
+  fillBoardHead(raw, t0, t1);           // 승리 팀 판정이 그 결과를 쓴다
   setUIMode('replay');            // 리플레이를 열면 바로 재생 화면으로
   markDirty(); renderLog(); updateTeamBar();
 }
@@ -135,7 +126,7 @@ function setMapLock(on){
 /* 리플레이를 닫고 맵 보기로 돌아간다. 판서·핀은 그대로 둔다 */
 const closeRep=document.getElementById('closeRep');
 closeRep.onclick=()=>{
-  G=null; repSlug=null; rosterHTML=''; tCur=0; playing=false; logCount=-1;
+  G=null; repSlug=null; tCur=0; playing=false; logCount=-1;
   playBtn.textContent='▶ 재생'; seek.value=0; clock.firstChild.textContent='00:00';
   document.getElementById('mapName').textContent='';
   setTeamHint();
@@ -188,10 +179,30 @@ document.getElementById('snapBoard').onclick=()=>{
     + (dead?` (사망 ${dead})`:'') + `, 파괴된 구조물 ${st}개 · Ctrl+Z 로 취소`);
 };
 
-function setTeamHint(){
-  document.getElementById('teamInfo').innerHTML=
-    '<span class="dim">🖌 도구로 지도 위에 전술을 그릴 수 있습니다</span>';
+/* 스코어보드 머리줄 — 팀 이름·전장·경기 길이·승패.
+   리플레이에는 팀 이름이 없으므로 «1팀/2팀» 에 대표 영웅을 붙여 알아보게 한다. */
+function fillBoardHead(raw, t0, t1){
+  const name = list => list.length ? `${list.length}인 · ${list.map(p=>p.hero).slice(0,2).join('·')}…` : '';
+  document.getElementById('bdName0').textContent = '1팀 ' + name(t0);
+  document.getElementById('bdName1').textContent = name(t1) + ' 2팀';
+  document.getElementById('bdMap').textContent = raw.map || '알 수 없는 전장';
+  const mins = Math.round((G.maxT||0)/60);
+  document.getElementById('bdSub').textContent =
+    `${fmtT(G.maxT||0)} · 선수 ${(t0.length+t1.length)}명 · 이벤트 ${G.evs.length}건`;
+  // 승리 팀 — 핵이 부서진 쪽의 반대. 부서진 핵이 없으면 표시하지 않는다.
+  let win = null;
+  for(const e of G.evs){
+    if(CAT(e)!=='struct') continue;
+    if(!/Core|King/.test(e.UnitType||e.unit||'')) continue;
+    const own = (typeof structOwner==='function') ? structOwner(e.x,e.y) : null;
+    if(own===0||own===1) win = own===0?1:0;
+  }
+  document.getElementById('bdWin0').hidden = win!==0;
+  document.getElementById('bdWin1').hidden = win!==1;
 }
+document.getElementById('boardShow').onclick=()=>setBoardState(0);
+document.getElementById('evPrev').onclick=()=>jumpEvent(-1);
+document.getElementById('evNext').onclick=()=>jumpEvent(1);
 
 document.getElementById('file').onchange=async ev=>{
   const f=ev.target.files[0]; if(!f)return;
@@ -246,6 +257,8 @@ window.addEventListener('keydown',function(e){
     if((e.key==='Delete'||e.key==='Backspace')&&selObj&&!typing){ delObj(selObj,true); return; }
   }
   if(typing||!G) return;
+  if(e.key==='Tab' && !e.shiftKey && document.body.classList.contains('has-replay')
+     && uiMode==='replay'){ e.preventDefault(); setBoardState(boardState+1); return; }
   if(e.code==='Space'){ e.preventDefault(); playBtn.onclick(); }
   // preventDefault 가 없으면 타임라인에 포커스가 있을 때 range 기본 스텝과 겹쳐 서로 덮어쓴다
   else if(e.key==='ArrowRight'){ e.preventDefault(); tCur=Math.min(G.maxT,tCur+5); logCount=-1; markDirty(); }
