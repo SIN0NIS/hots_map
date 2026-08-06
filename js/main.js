@@ -28,23 +28,66 @@ document.querySelectorAll('#modebar .tab').forEach(b=>
 
 /* --- 재생 루프 --- */
 const clock=document.getElementById('clock'), seek=document.getElementById('seek'), playBtn=document.getElementById('play');
-function tick(ts){
-  if(playing && G){
-    if(lastTs) tCur=Math.min(G.maxT, tCur+(ts-lastTs)/1000*speed);
-    if(tCur>=G.maxT){playing=false;playBtn.textContent='▶ 재생';}
-    needsDraw=true;
-  }
-  lastTs=ts;
-  if(needsDraw){
-    if(G && uiMode==='replay'){
-      seek.value=tCur/G.maxT*100;
-      clock.firstChild.textContent=fmtT(tCur);
-      renderLog(); updateTeamBar(); updateTimeline(); drawXp();
-    }
-    draw();
-  }
-  requestAnimationFrame(tick);
+/* 재생 루프.
+   예전에는 마지막 줄에서 다음 프레임을 예약했다. 그러면 갱신 함수 하나가 예외를
+   던지는 순간 예약이 통째로 건너뛰어져 루프가 «영영» 끊긴다. 화면에는 아무 표시도
+   나지 않아서, 그때부터 재생을 눌러도 아무 일이 없는 것처럼 보인다.
+   그래서 두 겹으로 막는다.
+     1. 다음 프레임 예약을 finally 로 옮겨, 무슨 일이 있어도 이어지게 한다.
+        예외는 삼키지 않고 한 번 화면에 알린다.
+     2. 그래도 멎으면 감시견이 되살린다. 되살릴 때는 세대 번호를 올려
+        예전 체인이 스스로 멈추게 한다 — 안 그러면 루프가 여러 겹 돌아
+        같은 프레임을 두 번씩 그린다. */
+let tickAlive = 0;                 // 마지막으로 한 프레임이 돈 시각
+let loopGen = 0;                   // 살아 있어야 할 체인의 세대
+let loopErrShown = false;
+function startLoop(){
+  const gen = ++loopGen;
+  const step = ts=>{
+    tickAlive = ts;
+    try{ tick(ts); }
+    finally{ if(gen===loopGen) requestAnimationFrame(step); }
+  };
+  requestAnimationFrame(step);
 }
+function tick(ts){
+  try{
+    if(playing && G){
+      if(lastTs) tCur=Math.min(G.maxT, tCur+(ts-lastTs)/1000*speed);
+      if(tCur>=G.maxT){playing=false;playBtn.textContent='▶ 재생';}
+      needsDraw=true;
+    }
+    lastTs=ts;
+    if(needsDraw){
+      if(G && uiMode==='replay'){
+        seek.value=tCur/G.maxT*100;
+        clock.firstChild.textContent=fmtT(tCur);
+        renderLog(); updateTeamBar(); updateTimeline(); drawXp();
+      }
+      draw();
+    }
+  }catch(err){
+    console.error('재생 루프 오류', err);
+    if(!loopErrShown){
+      loopErrShown = true;
+      setStatus('⚠ 화면 갱신 중 오류: ' + (err && err.message || err)
+                + ' — 재생은 계속됩니다 (콘솔에 자세한 내용)');
+    }
+  }
+}
+/* 감시견 — 어떤 이유로든 루프가 멎으면 되살린다.
+   창이 안 보이면 rAF 는 원래 멈추므로 그때는 따지지 않는다. */
+setInterval(()=>{
+  if(document.hidden) return;
+  const last = tickAlive;
+  requestAnimationFrame(ts=>{
+    if(ts - last > 1500){          // 1.5초 넘게 한 프레임도 안 돌았다
+      console.warn('재생 루프가 멎어 되살립니다');
+      lastTs = 0;                  // 멈춘 만큼 게임 시간이 건너뛰지 않게
+      startLoop();
+    }
+  });
+}, 2000);
 playBtn.onclick=()=>{ if(!G)return; if(tCur>=G.maxT)tCur=0;
   playing=!playing; playBtn.textContent=playing?'⏸ 정지':'▶ 재생'; markDirty(); };
 seek.oninput=()=>{ if(G){ tCur=seek.value/100*G.maxT; logCount=-1; markDirty(); } };
@@ -271,4 +314,4 @@ setUIMode('map');
 const START_MAP='cursed_hollow';
 const startM=MAP_DB.find(m=>m.slug===START_MAP)||MAP_DB[0];
 if(startM){ loadMapBySlug(startM.slug); syncHiResBtn(); }
-requestAnimationFrame(tick);
+startLoop();
