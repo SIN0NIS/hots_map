@@ -53,7 +53,10 @@ function startLoop(){
 function tick(ts){
   try{
     if(playing && G){
-      if(lastTs) tCur=Math.min(G.maxT, tCur+(ts-lastTs)/1000*speed);
+      // 프레임 간격을 0.25초로 자른다. 파싱·탭 전환처럼 오래 멎었다가 돌아오면
+      // (지금-마지막) 이 몇 초가 되고, 배속을 곱해 게임 시간이 한 번에 수십 초씩
+      // 뛰어오른다 (실측: 파싱 3초 멈춤 x4 배속 = 12초 건너뜀).
+      if(lastTs) tCur=Math.min(G.maxT, tCur+Math.min(0.25,(ts-lastTs)/1000)*speed);
       if(tCur>=G.maxT){playing=false;playBtn.textContent='▶ 재생';}
       needsDraw=true;
     }
@@ -89,7 +92,9 @@ setInterval(()=>{
   });
 }, 2000);
 playBtn.onclick=()=>{ if(!G)return; if(tCur>=G.maxT)tCur=0;
-  playing=!playing; playBtn.textContent=playing?'⏸ 정지':'▶ 재생'; markDirty(); };
+  playing=!playing; playBtn.textContent=playing?'⏸ 정지':'▶ 재생';
+  lastTs=0;                       // 누르기 직전까지 멎어 있던 시간은 재생에 안 센다
+  markDirty(); };
 seek.oninput=()=>{ if(G){ tCur=seek.value/100*G.maxT; logCount=-1; markDirty(); } };
 document.querySelectorAll('.spd').forEach(b=>b.onclick=()=>{
   speed=+b.dataset.s;
