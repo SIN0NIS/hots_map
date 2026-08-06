@@ -48,6 +48,8 @@ function undo(){
   if(a.t==='stroke'){ ST.strokes.pop(); replayStrokes(); }
   else if(a.t==='add'){ delObj(a.o,false); }
   else if(a.t==='addmany'){ a.objs.forEach(o=>delObj(o,false)); }
+  else if(a.t==='edit'){ Object.assign(a.o, a.before); paintObj(a.o);
+    if(a.o===selObj) refreshPanel(); }
   else if(a.t==='del'){ objsEl.appendChild(a.o.el); ST.objs.push(a.o); }
   else if(a.t==='clear'){
     ST.strokes=a.strokes; replayStrokes();
@@ -70,14 +72,15 @@ COLORS.forEach(c=>{
   b.style.background=c;
   b.onclick=()=>{ color=c;
     [...colorsEl.children].forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); };
+    b.classList.add('on');
+    applyToSel('color', c); };        // 고른 것이 있으면 그것도 바꾼다
   colorsEl.appendChild(b);
 });
 const teamRow=document.getElementById('teamrow');
 document.querySelectorAll('.teamb').forEach(b=>b.onclick=()=>{
   team=b.dataset.t;
   document.querySelectorAll('.teamb').forEach(x=>x.classList.toggle('on',x===b));
-  if(selObj&&selObj.type==='tok') setTokTeam(selObj,team);
+  applyToSel('team', team);
 });
 
 /* --- 영웅 팔레트: 내장 90명 + 직접 등록 --- */
@@ -95,7 +98,7 @@ function heroBtn(h){
   const im=document.createElement('img');
   im.src=h.src; im.alt=h.name; im.loading='lazy'; im.draggable=false;
   b.appendChild(im);
-  b.onclick=()=>{ heroSel=h; renderHeroes(); };
+  b.onclick=()=>{ heroSel=h; renderHeroes(); applyToSel('hero', h); };
   return b;
 }
 function renderHeroes(){
@@ -104,7 +107,7 @@ function renderHeroes(){
   const b0=document.createElement('button');
   b0.className='hb'+(heroSel===null?' on':'');
   b0.textContent='●'; b0.title='기본 (색 핀 / 번호 토큰)';
-  b0.onclick=()=>{ heroSel=null; renderHeroes(); };
+  b0.onclick=()=>{ heroSel=null; renderHeroes(); applyToSel('hero', null); };
   heroesEl.appendChild(b0);
   for(const h of BUILTIN_HEROES){
     if(q && !heroNorm(h.name).includes(q) && !heroNorm(h.en).includes(q)) continue;
@@ -150,16 +153,17 @@ function resizeObj(o,s){
     o.el.style.fontSize=Math.round(s*.72)+'px'; }
 }
 function setSlider(){
-  if(mode==='tok'){ szEl.min=16; szEl.max=400; szEl.value=selObj?selObj.s:tokSz; }
+  const selTok = selObj && selObj.type==='tok';
+  if(mode==='tok' || selTok){ szEl.min=16; szEl.max=400; szEl.value=selTok?selObj.s:tokSz; }
   else { szEl.min=2; szEl.max=40; szEl.value=penSz; }
   szv.textContent=szEl.value;
 }
 szEl.oninput=()=>{
   szv.textContent=szEl.value;
-  if(mode==='tok'){
-    tokSz=Math.min(+szEl.value,200);
-    if(selObj) resizeObj(selObj,+szEl.value);
-  } else penSz=+szEl.value;
+  const selTok = selObj && selObj.type==='tok';
+  if(selTok) resizeObj(selObj,+szEl.value);        // 고른 말이 있으면 그것만 바꾼다
+  if(mode==='tok') tokSz=Math.min(+szEl.value,200);
+  else if(!selTok) penSz=+szEl.value;
 };
 
 /* --- 모드 전환 --- */
@@ -190,18 +194,43 @@ function applyCursor(){
   const hot = (mode==='pen'||mode==='pin') ? '3 26' : '15 15';
   stage.style.cursor=`url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hot}, crosshair`;
 }
+/* 팔레트를 언제 보일지.
+   지금 도구가 쓰는 것 + «고른 것에 먹일 수 있는 것» 을 함께 본다.
+   이동/선택(✋) 중에 말을 하나 고르면 색·팀·초상화 팔레트가 그 자리에서 열려,
+   놓은 것을 바로 바꿀 수 있다. */
+function refreshPanel(){
+  const o=selObj;
+  const selPin = !!o && o.type==='pin', selTok = !!o && o.type==='tok', selMark = !!o && o.type==='mark';
+  const plain  = !!o && !o.heroSrc;                 // 초상화가 없는 것 = 색을 쓴다
+  const showColor = (mode==='pen'||mode==='pin') || ((selPin||selTok) && plain) || selMark;
+  const showTeam  = (mode==='tok'||mode==='pin') || selTok || (selPin && !!o.heroSrc);
+  const showHero  = (mode==='tok'||mode==='pin') || selPin || selTok;
+  const showSize  = (mode==='pen'||mode==='ers'||mode==='tok') || selTok;
+  colorsEl.style.display = showColor?'flex':'none';
+  teamRow.style.display  = showTeam ?'flex':'none';
+  heroesEl.style.display = showHero?'flex':'none';
+  hsearch.style.display  = showHero?'block':'none';
+  szwrap.style.display   = showSize?'flex':'none';
+  document.getElementById('hint').textContent =
+    o ? SEL_HINT(o) : HINTS[mode];
+  setSlider();
+}
+function SEL_HINT(o){
+  const what = o.type==='pin' ? '핀' : o.type==='tok' ? '말' : o.type==='mark' ? '표식' : '그림';
+  const can=[];
+  if((o.type==='pin'||o.type==='tok') && !o.heroSrc) can.push('색');
+  if(o.type==='mark') can.push('색');
+  if(o.type==='tok' || (o.type==='pin'&&o.heroSrc)) can.push('팀');
+  if(o.type==='pin'||o.type==='tok') can.push('초상화(●=지우기)');
+  if(o.type==='tok') can.push('크기');
+  return `${what} 하나를 골랐습니다 — ${can.join(' · ')}를 눌러 바꾸세요 · `
+       + `Delete 삭제 · Ctrl+Z 되돌리기 · 맨땅을 누르면 선택 해제`;
+}
 function setMode(m){
   mode=m;
   document.querySelectorAll('.it[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
-  colorsEl.style.display=(m==='pen'||m==='pin')?'flex':'none';
-  teamRow.style.display=(m==='tok'||m==='pin')?'flex':'none';
-  const showHero=(m==='tok'||m==='pin');
-  heroesEl.style.display=showHero?'flex':'none';
-  hsearch.style.display=showHero?'block':'none';
-  szwrap.style.display=(m==='pen'||m==='ers'||m==='tok')?'flex':'none';
-  document.getElementById('hint').textContent=HINTS[m];
   document.body.classList.toggle('objmove',toolOn&&m!=='pen'&&m!=='ers');
-  setSlider(); applyCursor();
+  refreshPanel(); applyCursor();
 }
 // 도구를 고르면 도구도 켠다. 안 그러면 «패널은 열려 있는데 아무것도 안 되는» 상태가 된다.
 document.querySelectorAll('.it[data-m]').forEach(b=>b.onclick=()=>{ setToolOn(true); setMode(b.dataset.m); });
@@ -225,8 +254,27 @@ function selectObj(o){
   selObj=o;
   if(o){
     o.el.classList.add('sel');
-    if(mode==='tok'&&o.type==='tok'&&o.s){ szEl.value=o.s; szv.textContent=o.s; }
+    // 팔레트의 «지금 값» 표시를 고른 것에 맞춘다 (무엇이 걸려 있는지 보이게)
+    if(o.color){ color=o.color;
+      [...colorsEl.children].forEach(x=>x.classList.toggle('on', x.style.background===o.color
+        || rgbEq(getComputedStyle(x).backgroundColor, o.color))); }
+    if(o.team){ team=o.team;
+      document.querySelectorAll('.teamb').forEach(x=>x.classList.toggle('on', x.dataset.t===o.team)); }
+    if(o.type==='pin'||o.type==='tok'){
+      heroSel = o.heroSrc ? {name:o.hero, src:o.heroSrc} : null;
+      renderHeroes();
+    }
   }
+  refreshPanel();
+}
+/* '#ff4d4d' 와 'rgb(255, 77, 77)' 를 같은 색으로 본다 */
+function rgbEq(a,b){
+  const p=s=>{ const m=String(s).match(/\d+/g);
+    if(m) return m.slice(0,3).map(Number);
+    const h=String(s).replace('#','');
+    return h.length===6 ? [0,2,4].map(i=>parseInt(h.slice(i,i+2),16)) : null; };
+  const x=p(a), y=p(b);
+  return !!x && !!y && x[0]===y[0] && x[1]===y[1] && x[2]===y[2];
 }
 
 /* --- 객체 --- */
@@ -234,67 +282,121 @@ function place(o){
   o.el.style.left=o.x+'px'; o.el.style.top=o.y+'px';
   if(o.type!=='pin') o.el.style.transform='translate(-50%,-50%)';
 }
-function setTokTeam(o,t){
-  o.team=t;
-  o.el.style.borderColor=TEAMC[t];
-  if(!o.hero) o.el.style.background=TEAMC[t];
+/* --- 놓은 뒤에도 바꿀 수 있게 ---
+   예전에는 «만들 때» 의 색·팀·초상화가 DOM 에 바로 구워져서, 한 번 놓으면
+   바꿀 방법이 없었다. 이제 객체가 자기 값(hero/team/color)을 들고 있고
+   paintObj() 가 그 값대로 모양을 다시 만든다. 만들 때도 같은 함수를 쓴다. */
+function paintObj(o){
+  const sel = o.el.classList.contains('sel');
+  if(o.type==='pin'){
+    const w=o.el;
+    w.replaceChildren();
+    if(o.heroSrc){
+      // 영웅 핀: 팀색 테두리 원형 아이콘 + 꼬리. 밑동이 (x,y)에 닿는다.
+      w.className='obj pinw hero';
+      const hp=document.createElement('div'); hp.className='pinh';
+      const tail=document.createElement('div'); tail.className='ph-t';
+      tail.style.borderTopColor=TEAMC[o.team||'blue'];
+      const c=document.createElement('div'); c.className='ph-c';
+      c.style.borderColor=TEAMC[o.team||'blue'];
+      const im=document.createElement('img'); im.src=o.heroSrc; im.alt=o.hero||''; im.draggable=false;
+      c.appendChild(im);
+      hp.appendChild(tail); hp.appendChild(c);
+      w.appendChild(hp);
+      w.title=o.hero||'';
+    }else{
+      w.className='obj pinw';
+      const b=document.createElement('div'); b.className='pinb';
+      b.style.background=o.color||color;
+      w.appendChild(b);
+      w.title='';
+    }
+    w.style.transform='scale('+(1/z)+')';
+  }else if(o.type==='tok'){
+    const el=o.el;
+    el.replaceChildren();
+    el.className='obj tok';
+    el.style.borderStyle='solid';
+    if(o.heroSrc){
+      const im=document.createElement('img'); im.src=o.heroSrc; im.alt=o.hero||''; im.draggable=false;
+      el.appendChild(im);
+      el.style.background='#06101c'; el.title=o.hero||'';
+    }else{
+      el.textContent=o.label;
+      el.style.background=o.color || TEAMC[o.team];
+      el.title='';
+    }
+    el.style.borderColor=TEAMC[o.team];
+    if(o.dead) el.classList.add('dead');
+    resizeObj(o,o.s);
+  }else if(o.type==='mark'){
+    o.el.style.color=o.color||'';
+    o.el.style.borderColor=o.color||'';
+  }
+  if(sel) o.el.classList.add('sel');
+  place(o);
 }
+/* 고른 것의 값을 바꾼다. 되돌리기 한 번이면 원래대로. */
+function editObj(o, patch){
+  if(!o) return;
+  const before={};
+  let changed=false;
+  for(const k in patch){ if(o[k]!==patch[k]){ before[k]=o[k]; changed=true; } }
+  if(!changed) return;
+  Object.assign(o, patch);
+  paintObj(o);
+  ST.hist.push({t:'edit', o, before});
+  if(o===selObj) refreshPanel();   // 초상화가 붙고 떨어지면 필요한 팔레트가 달라진다
+}
+/* 도구 팔레트에서 고른 값을 «지금 고른 것» 에 입힌다 */
+function applyToSel(kind, v){
+  const o=selObj;
+  if(!o) return false;
+  if(kind==='color'){
+    if(o.type==='pin' && o.heroSrc) return false;   // 영웅 핀은 팀 색을 쓴다
+    if(o.type==='tok' && o.heroSrc) return false;
+    editObj(o,{color:v}); return true;
+  }
+  if(kind==='team'){
+    if(o.type!=='tok' && !(o.type==='pin' && o.heroSrc)) return false;
+    editObj(o,{team:v, color:null}); return true;
+  }
+  if(kind==='hero'){
+    if(o.type!=='tok' && o.type!=='pin') return false;
+    editObj(o, v ? {hero:v.name, heroSrc:v.src} : {hero:null, heroSrc:null});
+    return true;
+  }
+  return false;
+}
+function setTokTeam(o,t){ editObj(o,{team:t}); }
 function addTok(x,y){
   const el=document.createElement('div');
-  el.className='obj tok'; el.style.borderStyle='solid';
-  const o={type:'tok',x,y,s:tokSz,team,hero:null,el};
-  if(heroSel){
-    o.hero=heroSel.name;
-    const im=document.createElement('img');
-    im.src=heroSel.src; im.draggable=false;
-    el.appendChild(im);
-    el.style.background='#06101c'; el.title=o.hero;
-  }else{
-    el.textContent=(team==='blue'?'B':'R')+(++cnt[team]);
-  }
-  setTokTeam(o,team);
-  place(o); resizeObj(o,tokSz);
+  const o={type:'tok', x, y, s:tokSz, team, hero:null, heroSrc:null, color:null, el,
+           label:(team==='blue'?'B':'R')+(++cnt[team])};
+  if(heroSel){ o.hero=heroSel.name; o.heroSrc=heroSel.src; }
+  paintObj(o);
   objsEl.appendChild(el); ST.objs.push(o);
   ST.hist.push({t:'add',o});
   return o;
 }
 function addPin(x,y){
   const w=document.createElement('div');
-  const o={type:'pin',x,y,el:w};
-  if(heroSel){
-    // 영웅 핀: 팀색 테두리 원형 아이콘 + 꼬리. 밑동이 (x,y)에 닿는다.
-    w.className='obj pinw hero';
-    const hp=document.createElement('div'); hp.className='pinh';
-    const c=document.createElement('div'); c.className='ph-c';
-    c.style.borderColor=TEAMC[team];
-    const im=document.createElement('img'); im.src=heroSel.src; im.draggable=false;
-    c.appendChild(im);
-    const t=document.createElement('div'); t.className='ph-t';
-    t.style.borderTopColor=TEAMC[team];
-    hp.appendChild(t); hp.appendChild(c);
-    w.appendChild(hp);
-    w.title=heroSel.name;
-    o.hero=heroSel.name; o.team=team;
-  }else{
-    w.className='obj pinw';
-    const b=document.createElement('div'); b.className='pinb'; b.style.background=color;
-    w.appendChild(b);
-  }
-  place(o); w.style.transform='scale('+(1/z)+')';
+  const o={type:'pin', x, y, el:w, team, hero:null, heroSrc:null, color:color};
+  if(heroSel){ o.hero=heroSel.name; o.heroSrc=heroSel.src; }
+  paintObj(o);
   objsEl.appendChild(w); ST.objs.push(o);
   ST.hist.push({t:'add',o});
   return o;
 }
 /* 표식 — 파괴된 구조물처럼 «자리»만 알려 주는 객체.
-   토큰과 달리 팀·번호가 없고, 옮기고 지우는 것은 똑같이 된다. */
+   말과 달리 팀·번호가 없고, 옮기고 지우고 색 바꾸는 것은 똑같이 된다. */
 function addMark(x,y,txt,cls,s){
   const el=document.createElement('div');
   el.className='obj mark '+(cls||'');
   el.textContent=txt||'✕';
-  const o={type:'mark',x,y,s:s||34,el};
-  el.style.width=el.style.height=o.s+'px';
-  el.style.fontSize=Math.round(o.s*.72)+'px';
-  place(o); objsEl.appendChild(el); ST.objs.push(o);
+  const o={type:'mark', x, y, s:s||34, color:null, el};
+  place(o); resizeObj(o,o.s);
+  objsEl.appendChild(el); ST.objs.push(o);
   ST.hist.push({t:'add',o});
   return o;
 }

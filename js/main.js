@@ -208,7 +208,7 @@ document.getElementById('snapBoard').onclick=()=>{
     team = hh.team===1?'red':'blue';
     heroSel = hd ? {name:hh.heroName, src:'icons/'+hd.icon} : null;
     const o=addTok(px,py);
-    if(p.dead){ o.el.classList.add('dead'); o.el.title=hh.heroName+' (사망 중)'; dead++; }
+    if(p.dead){ o.dead=true; paintObj(o); o.el.title=hh.heroName+' (사망 중)'; dead++; }
     else alive++;
     made.push(o);
   }
