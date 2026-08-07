@@ -320,12 +320,16 @@ function drawXpBig(){
   drawLvTable();
 }
 
-/* ── 오른쪽 파이 ────────────────────────────────────────────────────
-   선 그래프는 «흐름» 을, 파이는 «지금 무엇이/누가 얼마나» 를 맡는다.
+/* ── 오른쪽 파이 ──────────────────────────────────
+   선 그래프는 «흐름» 을, 파이는 «누가/무엇이 얼마나» 를 맡는다.
    항목별 선을 여러 개 겹쳐 놓으면 어느 쪽이 큰지 읽기 어렵기 때문이다.
 
      합계   항목 파이 (팀별) + 영웅 파이 (팀별)
      항목   영웅 파이만
+
+   파이는 «경기 전체» 를 센다. 옆의 선 그래프도 경기 전체를 그리므로
+   눈금을 맞춘다 — 예전에는 재생 시각까지만 셌는데, 그러면 재생 전에
+   창을 열었을 때 (tCur = 0) 죄다 «자료 없음» 으로 비어 보였다.
 
    영웅 파이의 근거가 둘로 나뉜다 —
      합계는 점수표의 ExperienceContribution 이라 «진짜 경험치 기여» 다.
@@ -341,25 +345,7 @@ const PIE_SRC = {
 function pieSlices(vals, colors){
   const tot = vals.reduce((a,v)=>a+v.n, 0);
   if(!tot) return null;
-  let acc = 0;
-  const stops = vals.map((v,i)=>{
-    const a = acc/tot*100; acc += v.n; const b = acc/tot*100;
-    return `${colors[i]} ${a.toFixed(2)}% ${b.toFixed(2)}%`;
-  });
-  return { css:`conic-gradient(${stops.join(',')})`, tot,
-           rows: vals.map((v,i)=>({...v, c:colors[i], p:v.n/tot*100})) };
-}
-function pieBox(title, cls, sl, fmt){
-  if(!sl) return `<div class="pieone"><div class="tt ${cls}">${title}</div>
-    <div class="lg"><b>자료 없음</b></div></div>`;
-  const rows = sl.rows.filter(r=>r.n>0).sort((a,b)=>b.n-a.n).slice(0,6);
-  return `<div class="pieone"><div>
-      <div class="tt ${cls}">${title}</div>
-      <div class="pie" style="background:${sl.css}"></div>
-    </div><div class="lg">` +
-    rows.map(r=>`<b title="${r.ko} — ${fmt(r.n)} (${r.p.toFixed(1)}%)">`
-      + `<i style="background:${r.c}"></i>${r.ko}<s>${r.p.toFixed(0)}%</s></b>`).join('') +
-    `</div></div>`;
+  return { tot, rows: vals.map((v,i)=>({...v, c:colors[i], p:v.n/tot*100})) };
 }
 /* 팀 색을 밝기로 다섯 단계 — 같은 팀 안에서 구분되게 */
 function heroColors(team){
@@ -367,26 +353,100 @@ function heroColors(team){
   return [0,1,2,3,4].map(i=>
     `oklch(${(base[0]+i*0.07).toFixed(2)} ${(base[1]-i*0.022).toFixed(3)} ${base[2]})`);
 }
+
+/* 아이콘은 한 번만 불러 둔다. 당장은 비어 있고, 다 받으면 다시 그린다. */
+const pieImgs = new Map();
+function pieImg(src, redraw){
+  let im = pieImgs.get(src);
+  if(!im){ im = new Image(); im.onload = redraw; im.onerror = ()=>{}; im.src = src;
+           pieImgs.set(src, im); }
+  return im;
+}
+/* 파이 하나를 캔버스에 그린다.
+   조각에 색만 입히면 범례와 눈을 오가야 하므로, 조각 안에 영웅 초상화를
+   직접 박고 그 아래에 퍼센트를 적는다. 너무 얇은 조각은 건너뛰고 범례에만 남긴다. */
+function drawPieCanvas(cv, sl, R, redraw){
+  const S = R*2 + 6, dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(S*dpr); cv.height = Math.round(S*dpr);
+  cv.style.width = S+'px'; cv.style.height = S+'px';
+  const g = cv.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,S,S);
+  const cx = S/2, cy = S/2;
+  const rows = sl.rows.filter(r=>r.n>0).sort((a,b)=>b.n-a.n);
+  let a0 = -Math.PI/2;
+  const seg = [];
+  for(const r of rows){
+    const a1 = a0 + r.p/100*Math.PI*2;
+    g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,R,a0,a1); g.closePath();
+    g.fillStyle = r.c; g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 1.5; g.stroke();
+    seg.push({ r, mid:(a0+a1)/2 }); a0 = a1;
+  }
+  for(const s of seg){
+    if(s.r.p < 5) continue;
+    const rr = R*0.52;
+    const x = cx + Math.cos(s.mid)*rr, y = cy + Math.sin(s.mid)*rr;
+    const d = Math.max(R*0.32, Math.min(R*0.56, R*0.22 + s.r.p*R*0.010));
+    const im = s.r.ic ? pieImg(s.r.ic, redraw) : null;
+    if(im && im.complete && im.naturalWidth){
+      g.save();
+      g.beginPath(); g.arc(x, y, d/2, 0, Math.PI*2); g.closePath();
+      g.fillStyle='rgba(0,0,0,.55)'; g.shadowColor='rgba(0,0,0,.65)'; g.shadowBlur=7;
+      g.fill(); g.shadowBlur=0; g.clip();
+      g.drawImage(im, x-d/2, y-d/2, d, d);
+      g.restore();
+      g.beginPath(); g.arc(x, y, d/2, 0, Math.PI*2);
+      g.strokeStyle='rgba(255,255,255,.8)'; g.lineWidth=1.5; g.stroke();
+    }
+    const ty = im ? y + d/2 + 9 : y + 4;
+    g.font = `600 ${Math.round(R*0.155)}px ui-monospace,Menlo,Consolas,monospace`;
+    g.textAlign='center'; g.textBaseline='middle';
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)';
+    g.strokeText(`${Math.round(s.r.p)}%`, x, ty);
+    g.fillStyle = '#fff'; g.fillText(`${Math.round(s.r.p)}%`, x, ty);
+  }
+}
+/* 파이 하나의 자리 — 캔버스는 빈 채로 내고, 붙인 다음에 그린다 */
+function pieBox(title, cls, sl, fmt, jobs){
+  if(!sl) return `<div class="pieone none"><div class="tt ${cls}">${title}</div>
+    <div class="lg"><b>자료 없음</b></div></div>`;
+  const id = 'pc'+(jobs.length);
+  jobs.push({ id, sl });
+  const rows = sl.rows.filter(r=>r.n>0).sort((a,b)=>b.n-a.n);
+  // 캔버스는 0 크기로 내보낸다 — 붙인 다음 남은 높이를 재서 크기를 정한다
+  return `<div class="pieone"><canvas class="piecv" id="${id}" style="width:0;height:0"></canvas>`
+    + `<div class="lg">`
+    + `<div class="tt ${cls}">${title}</div>`
+    + rows.map(r=>`<b title="${r.ko} — ${fmt(r.n)} (${r.p.toFixed(1)}%)">`
+      + (r.ic ? `<img src="${r.ic}" alt="" style="outline:2px solid ${r.c}">`
+              : `<i style="background:${r.c}"></i>`)
+      + `<span>${r.ko}</span><u>${fmt(r.n)}</u><s>${r.p.toFixed(0)}%</s></b>`).join('')
+    + `</div></div>`;
+}
+
 function drawPies(kind){
   const el = document.getElementById('xpPies');
   if(!el) return;
   if(!G){ el.innerHTML=''; return; }
-  const rows = (G.teamXp||[]).filter(r=>r.t<=tCur);
-  const cur = [null,null];
-  for(const r of rows) cur[r.team]=r;
   const num = v => Math.round(v).toLocaleString();
+  const jobs = [];
   let h = '';
 
-  // 1) 항목 파이 — 합계일 때만. 팀별로 지금까지 쌓인 경험치의 구성.
+  // 파이는 경기 전체 기준 — 마지막 표본을 팀별로 집는다
+  const cur = [null,null];
+  for(const r of (G.teamXp||[])) cur[r.team] = r;
+
+  // 1) 항목 파이 — 합계일 때만. 팀별로 경험치가 어디서 나왔는지.
   if(kind==='total' && (cur[0]||cur[1])){
-    h += `<div class="piegrp"><h4>항목 구성 <em>지금까지 쌓인 경험치</em></h4><div class="pierow">`;
+    h += `<div class="piegrp"><h4>항목 구성 <em>경험치가 어디서 나왔나</em></h4>`;
     for(const tm of [0,1]){
       const c = cur[tm];
       const sl = c ? pieSlices(XP_SUB.map(k=>({ko:XP_KIND[k], n:c[k]||0})),
                                XP_SUB.map(k=>XP_COL[k])) : null;
-      h += pieBox(`${tm+1}팀 ${c?num(xpTotal(c)):''}`, tm?'r':'b', sl, num);
+      h += pieBox(`${tm+1}팀 <u>${c?num(xpTotal(c)):''}</u>`, tm?'r':'b', sl, num, jobs);
     }
-    h += `</div></div>`;
+    h += `</div>`;
   }
 
   // 2) 영웅 파이
@@ -396,6 +456,7 @@ function drawPies(kind){
   const byTeam = [[],[]];
   for(const lab in G.heroes){
     const hh=G.heroes[lab], tm = hh.team===1?1:0;
+    const hd = heroByName(hh.heroName);
     let n = 0;
     if(kind==='total'){
       n = (sc.ExperienceContribution||[])[idx[lab]] || 0;
@@ -404,33 +465,46 @@ function drawPies(kind){
     }else{
       const s = PIE_SRC[kind];
       if(s && s.td){
-        for(const e of G.evs){ if(e.t>tCur) break;
-          if(e.e==='PlayerDeath' && (e.killers||[]).includes(lab)) n++; }
+        for(const e of G.evs)
+          if(e.e==='PlayerDeath' && (e.killers||[]).includes(lab)) n++;
       }else if(s){
-        n = s.pick(((G.raw&&G.raw.kill_anchors||{})[lab]||[]).filter(k=>k[0]<=tCur));
+        n = s.pick((G.raw&&G.raw.kill_anchors||{})[lab]||[]);
       }
     }
-    byTeam[tm].push({ko:hh.heroName, n});
+    byTeam[tm].push({ ko:hh.heroName, n, ic: hd ? `icons/${hd.icon}` : null });
   }
-  const src = kind==='total' ? '경험치 기여 (점수표 · 경기 최종값)'
+  const src = kind==='total' ? '경험치 기여 (점수표)'
             : kind==='trickle' ? ''
-            : (PIE_SRC[kind] ? `${PIE_SRC[kind].ko} 수 · 지금까지` : '');
+            : (PIE_SRC[kind] ? `${PIE_SRC[kind].ko} 수` : '');
   if(kind==='trickle'){
     h += `<div class="piegrp"><h4>영웅 몫</h4>
       <p class="pienote">«시간 경과» 경험치는 팀 전체에 붙는 값이라 영웅별로 나뉘지 않습니다.</p></div>`;
   }else{
-    h += `<div class="piegrp"><h4>영웅 몫 <em>${src}</em></h4><div class="pierow">`;
-    for(const tm of [0,1]){
-      const sl = pieSlices(byTeam[tm], heroColors(tm));
-      h += pieBox(`${tm+1}팀`, tm?'r':'b', sl, num);
-    }
-    h += `</div>`;
+    h += `<div class="piegrp"><h4>영웅 몫 <em>${src}</em></h4>`;
+    for(const tm of [0,1])
+      h += pieBox(`${tm+1}팀`, tm?'r':'b', pieSlices(byTeam[tm], heroColors(tm)), num, jobs);
     if(kind!=='total')
       h += `<p class="pienote">영웅별 «항목 경험치» 는 리플레이에 없습니다 —
             그 항목을 만드는 사건 수로 나눈 비율입니다.</p>`;
     h += `</div>`;
   }
+  h += `<p class="pienote">모두 <b>경기 전체</b> 기준입니다 (옆의 선 그래프와 같은 범위).</p>`;
   el.innerHTML = h;
+
+  // 남은 높이를 파이 개수로 나눠 크기를 정한다 — 스크롤 없이 다 보이게.
+  // (캔버스를 0 으로 내보냈으므로 지금 scrollHeight 는 «파이를 뺀» 높이다)
+  let R = jobs.length > 2 ? 66 : 92;
+  if(jobs.length && el.clientHeight > 120){
+    const row  = el.querySelector('.pieone').clientHeight;      // 범례가 정하는 최소 높이
+    const room = row + (el.clientHeight - el.scrollHeight - 4) / jobs.length;
+    R = Math.max(58, Math.min(96, Math.floor((room - 6) / 2)));
+  }
+  const redraw = () => { for(const j of jobs){
+    const cv = document.getElementById(j.id); if(cv) drawPieCanvas(cv, j.sl, R, ()=>{}); } };
+  for(const j of jobs){
+    const cv = document.getElementById(j.id);
+    if(cv) drawPieCanvas(cv, j.sl, R, redraw);
+  }
 }
 /* 레벨 문턱값 표 — «경험치를 얼마나 모아야 몇 레벨인가».
    리플레이는 30초마다 표본만 남기므로 문턱은 구간으로만 알 수 있다 (js/data_levels.js 참고). */

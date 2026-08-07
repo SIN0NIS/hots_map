@@ -217,23 +217,33 @@ body.mode-replay.has-replay.board-off #boardShow{display:inline-block}
 #gXpBig{flex:1;min-width:0;height:100%;background:color-mix(in oklab,var(--bg) 60%,transparent);
   border:1px solid var(--line);border-radius:6px;cursor:crosshair}
 /* 오른쪽 파이 — 선 그래프는 «흐름», 파이는 «지금 누가/무엇이 얼마나» 를 맡는다 */
-#xpPies{flex:none;width:min(38%,420px);overflow:auto;display:flex;flex-direction:column;gap:8px}
-.piegrp{border:1px solid var(--line);border-radius:6px;padding:6px 8px;
-  background:color-mix(in oklab,var(--bg) 35%,transparent)}
-.piegrp>h4{font-size:calc(10px * var(--fs));color:var(--gold-dim);font-weight:600;
-  letter-spacing:.06em;margin-bottom:5px;display:flex;align-items:center;gap:6px}
-.piegrp>h4 em{font-style:normal;color:var(--dim);font-weight:400;letter-spacing:0}
-.pierow{display:flex;gap:10px}
-.pieone{flex:1;min-width:0;display:flex;gap:7px;align-items:flex-start}
-.pieone .pie{flex:none;width:74px;height:74px;border-radius:50%;
-  box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--ink) 20%,transparent)}
-.pieone .lg{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;
-  font-size:calc(9px * var(--fs));line-height:1.35}
-.pieone .lg b{display:flex;align-items:center;gap:4px;font-weight:400;color:var(--dim);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pieone .lg b i{flex:none;width:8px;height:8px;border-radius:2px}
-.pieone .lg b s{text-decoration:none;margin-left:auto;font-family:var(--mono);color:var(--ink)}
-.pieone .tt{font-size:calc(9px * var(--fs));color:var(--dim);margin-bottom:2px}
+/* 오른쪽 파이 — 선 그래프는 «흐름», 파이는 «누가/무엇이 얼마나» 를 맡는다.
+   팀을 좌우로 놓으면 파이가 반쪽씩 작아지므로 위아래로 쌓는다. */
+#xpPies{flex:none;width:min(44%,470px);overflow:auto;display:flex;flex-direction:column;gap:8px}
+.piegrp{border:1px solid var(--line);border-radius:6px;padding:7px 9px;display:flex;
+  flex-direction:column;gap:8px;background:color-mix(in oklab,var(--bg) 35%,transparent)}
+.piegrp>h4{font-size:calc(11px * var(--fs));color:var(--gold-dim);font-weight:600;
+  letter-spacing:.06em;display:flex;align-items:center;gap:6px}
+.piegrp>h4 em{font-style:normal;color:var(--dim);font-weight:400;letter-spacing:0;
+  font-size:calc(10px * var(--fs))}
+.pieone{display:flex;gap:10px;align-items:center}
+.pieone.none{align-items:flex-start}
+.pieone .piecv{flex:none}
+.pieone .lg{flex:1;min-width:0;display:flex;flex-direction:column;gap:0;
+  font-size:calc(10px * var(--fs));line-height:1.28}
+.pieone .lg b{display:flex;align-items:center;gap:5px;font-weight:400;color:var(--ink);
+  white-space:nowrap;overflow:hidden}
+.pieone .lg b i{flex:none;width:10px;height:10px;border-radius:2px}
+.pieone .lg b img{flex:none;width:18px;height:18px;border-radius:50%;object-fit:cover;
+  outline-offset:-1px}
+.pieone .lg b span{overflow:hidden;text-overflow:ellipsis}
+.pieone .lg b u{text-decoration:none;margin-left:auto;font-family:var(--mono);
+  color:var(--dim);font-size:calc(9px * var(--fs))}
+.pieone .lg b s{text-decoration:none;font-family:var(--mono);color:var(--ink);
+  font-weight:600;min-width:32px;text-align:right}
+.pieone .tt{font-size:calc(11px * var(--fs));color:var(--dim);font-weight:600;
+  margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.pieone .tt u{text-decoration:none;font-family:var(--mono);color:var(--ink);font-weight:400}
 .pieone .tt.b{color:var(--blue)} .pieone .tt.r{color:var(--red)}
 .pienote{font-size:calc(9px * var(--fs));color:var(--dim);line-height:1.6;opacity:.85}
 
