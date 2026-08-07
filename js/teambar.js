@@ -43,71 +43,97 @@ function buildTeamBar(){
   }
   for(const k in picks) picks[k].sort((a,b)=>a.t-b.t);
   for(const k in levels) levels[k].sort((a,b)=>a.t-b.t);
-
-  // 특성 레벨 머리줄 (1 4 7 10 13 16 20)
-  for(let i=0;i<2;i++){
-    const h=document.createElement('div'); h.className='tlhead';
-    h.appendChild(Object.assign(document.createElement('span'),{className:'who'}));
-    for(const lv of TIERS){
-      const s=document.createElement('span'); s.className='tl'; s.textContent=lv; h.appendChild(s);
-    }
-    const kh=document.createElement('span'); kh.className='kh'; kh.id='kh'+i; kh.textContent='특성';
-    h.appendChild(kh);
-    teamEls[i].appendChild(h);
+  // 티어별로 하나씩 꽂는다. 티어를 모르는 특성은 남은 칸에 순서대로 채운다.
+  const pickMap = {};
+  for(const lab in picks){
+    const m = {}, rest = [];
+    for(const p of picks[lab]){ if(p.lv && !m[p.lv]) m[p.lv]=p; else rest.push(p); }
+    for(const tier of TIERS) if(!m[tier] && rest.length) m[tier]=rest.shift();
+    pickMap[lab] = m;
   }
 
   for(const lab in G.heroes){
     const hh = G.heroes[lab];
     const team = hh.team===1 ? 1 : 0;
     const hd = heroByName(hh.heroName);
+    const ad = (typeof ABIL_DB!=='undefined') ? ABIL_DB[hh.heroName] : null;
     const row = document.createElement('div');
     row.className = 'pl';
 
-    // 초상화 + 이름 (누르면 그 선수를 강조)
+    /* ── 관전 UI 배치 ─────────────────────────────────────────────
+       [1·4·7 특성] [큰 초상화 + 좌하단 궁극기] [13·16·20 특성]
+                    [ Q W E D 스킬 아이콘 ]
+       왼쪽 세 칸이 초반 티어(1/4/7), 오른쪽 세 칸이 후반(13/16/20)이고
+       10레벨 궁극기는 초상화 왼쪽 아래에 작게 붙는다. 실제 관전 UI 와 같다. */
+    const picks = pickMap[lab] || {};
+    const mkTal = tier => {
+      const i = document.createElement('i');
+      i.className = 'tcell';
+      const p = picks[tier];
+      if(p){
+        i.dataset.t = p.t; i.title = `${tier} 레벨 · ${p.ko}`;
+        if(p.ic){ const im=document.createElement('img'); im.src='talents/'+p.ic+'.webp'; im.alt=p.ko; i.appendChild(im); }
+        else i.classList.add('noic');
+      }else i.title = `${tier} 레벨 · (안 찍음)`;
+      return i;
+    };
+    const pips = {};
+    const early = document.createElement('span'); early.className='tside early';
+    for(const tier of [1,4,7]){ const c=mkTal(tier); pips[tier]=c; early.appendChild(c); }
+    const late  = document.createElement('span'); late.className='tside late';
+    for(const tier of [13,16,20]){ const c=mkTal(tier); pips[tier]=c; late.appendChild(c); }
+
+    // 초상화 + 궁극기(10레벨)
     const who = document.createElement('button');
     who.type='button'; who.className='who'; who.title=lab;
     const por = document.createElement('span'); por.className='por';
-    if(hd){ const im=document.createElement('img'); im.src='icons/'+hd.icon; im.alt=hh.heroName; por.appendChild(im); }
+    const psrc = ad && ad.p ? 'portraits/'+ad.p+'.webp' : (hd ? 'icons/'+hd.icon : '');
+    if(psrc){ const im=document.createElement('img'); im.src=psrc; im.alt=hh.heroName; por.appendChild(im); }
+    const ult = mkTal(10); ult.classList.add('ult'); por.appendChild(ult);
+    pips[10] = ult;
     who.appendChild(por);
+
+    // 이름
     const nc = document.createElement('span'); nc.className='nmcol';
     const hn = document.createElement('span'); hn.className='hero'; hn.textContent=hh.heroName;
     const un = document.createElement('span'); un.className='user';
     un.textContent = lab.replace(/\(.*\)$/,'').trim() || lab;
-    nc.append(hn,un); who.appendChild(nc);
-    row.appendChild(who);
+    nc.append(hn,un);
 
-    // 특성 7칸
-    const list = picks[lab] || [], pips = [], byTier = {}, rest = [];
-    for(const p of list){ if(p.lv && !byTier[p.lv]) byTier[p.lv]=p; else rest.push(p); }
-    for(const tier of TIERS){
-      const i = document.createElement('i');
-      i.className='tcell';
-      const p = byTier[tier] || rest.shift();
-      if(p){
-        i.dataset.t=p.t; i.title=`${tier} 레벨 · ${p.ko}`;
-        if(p.ic){ const im=document.createElement('img'); im.src='talents/'+p.ic+'.webp'; im.alt=p.ko; i.appendChild(im); }
-        else i.classList.add('noic');
-      }else i.title=`${tier} 레벨 · (안 찍음)`;
-      row.appendChild(i); pips.push(i);
+    /* 스킬 줄 — 아이콘·이름·기본 쿨타임은 게임 데이터라 정확하다.
+       다만 «지금 이 스킬이 쿨인가» 는 알 수 없다. 리플레이의 스킬 사용 기록은
+       내부 번호(abilLink)뿐이고, 그 번호가 Q/W/E 중 무엇인지 리플레이만으로는
+       못 가린다 (쿨타임 지문으로 맞춰 보니 60% — 10개 중 4개가 엉뚱한 스킬이 된다).
+       그래서 «무엇을 쓸 수 있나»만 보여 주고, 방금 쓴 것은 아래 슬롯 표시로 낸다. */
+    const sk = document.createElement('span'); sk.className='skrow';
+    for(const s of (ad && ad.sk || []).filter(s=>['Q','W','E','Trait'].includes(s.s)).slice(0,4)){
+      const u = document.createElement('u');
+      const im = document.createElement('img'); im.src='abilities/'+s.i+'.webp'; im.alt=s.n;
+      u.appendChild(im);
+      const k = document.createElement('b'); k.textContent = s.s==='Trait' ? 'D' : s.s;
+      u.appendChild(k);
+      if(s.cd){ const c=document.createElement('em'); c.textContent=s.cd+'초'; u.appendChild(c); }
+      u.title = `${s.s==='Trait'?'D':s.s} · ${s.n}` + (s.cd?` · 기본 재사용 대기시간 ${s.cd}초`:'');
+      sk.appendChild(u);
     }
 
-    // 스킬 사용 — 이 영웅이 쓴 «고유 스킬 번호»를 처음 쓴 순서로 칸에 배정하고,
-    // 그 스킬을 방금 썼으면 칸에 불이 들어온다. (번호가 Q/W/E/R 중 무엇인지는
-    // 리플레이만으로 알 수 없어 «슬롯»으로만 보여 준다)
+    // 최근에 쓴 스킬 — 번호를 처음 쓴 순서로 칸에 배정한다 (어느 스킬인지는 모른다)
     const casts = (hh.pts||[]).filter(p=>p.src==='a' && p.link!=null && !SHARED_ABIL.has(p.link));
     const order = [];
     for(const c of casts) if(!order.includes(c.link) && order.length<SK_SLOTS) order.push(c.link);
-    const sk = document.createElement('span'); sk.className='sk';
+    const bars = document.createElement('span'); bars.className='sk';
     const slots = order.map((lk,i)=>{
       const u=document.createElement('u');
-      u.title=`스킬 ${i+1} (번호 ${lk}) · ${casts.filter(c=>c.link===lk).length}회 사용`;
-      sk.appendChild(u); return {el:u, link:lk};
+      u.title=`스킬 ${i+1} (내부 번호 ${lk}) · ${casts.filter(c=>c.link===lk).length}회 사용`;
+      bars.appendChild(u); return {el:u, link:lk};
     });
-    row.appendChild(sk);
 
-    // 수치 칸
     const kda=document.createElement('span'); kda.className='kda';
-    row.appendChild(kda);
+
+    const col = document.createElement('span'); col.className='col';
+    col.append(nc, sk, bars);
+    if(team===0) row.append(early, who, col, late, kda);
+    else         row.append(kda, late, col, who, early);
 
     teamEls[team].appendChild(row);
     const card = {lab, card:row, pips, hh, slots, kda, lv:1,
@@ -132,13 +158,7 @@ pageTabs.querySelectorAll('button').forEach(b=>b.onclick=()=>{
   pageTabs.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
   applyPage(); updateTeamBar();
 });
-function applyPage(){
-  for(let i=0;i<2;i++){
-    const kh=document.getElementById('kh'+i);
-    if(kh) kh.textContent = PAGE_KO[statPage] || '';
-  }
-  fillStats();
-}
+function applyPage(){ fillStats(); }
 /* 지금 시각까지의 선수별 «처치 관여 / 데스».
    리플레이의 KillingPlayer 는 «관여자 목록»이라 누가 막타인지는 알 수 없다.
    그래서 킬/어시로 나누지 않고 히오스 기준인 처치 관여(Takedown)로 센다. */
@@ -169,7 +189,8 @@ function updateTeamBar(){
     const dead = !!(p && p.dead);
     if(c.card.classList.contains('dead')!==dead) c.card.classList.toggle('dead',dead);
     let got=0;
-    for(const i of c.pips){
+    for(const tier of TIERS){
+      const i = c.pips[tier]; if(!i) continue;
       const t=i.dataset.t, on = t!==undefined && +t<=tCur;
       if(i.classList.contains('got')!==on) i.classList.toggle('got',on);
       const fresh = on && tCur-+t<3;
