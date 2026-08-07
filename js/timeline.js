@@ -309,6 +309,7 @@ const xpLegend2=document.getElementById('xpLegend2');
 const lvTable=document.getElementById('lvTable');
 const xpLvLines=document.getElementById('xpLvLines');
 const xpPerTeam=document.getElementById('xpPerTeam');
+const xpPieLive=document.getElementById('xpPieLive');
 xpKind2.replaceChildren(...Object.keys(XP_KIND).map(k=>{
   const o=document.createElement('option'); o.value=k; o.textContent=XP_KIND[k]; return o; }));
 
@@ -316,8 +317,18 @@ function drawXpBig(){
   const kind = xpKind2.value || 'total';
   drawXpOn(gXpBig, {kind, big:true, lvLines:xpLvLines.checked, perTeam:xpPerTeam.checked});
   xpLegend2.innerHTML = xpLegendHTML(kind, true);
-  drawPies(kind);
+  drawPies(kind, xpPieLive.checked);
+  pieLastT = tCur;
   drawLvTable();
+}
+/* 재생 루프가 매 프레임 부른다. «재생 시각까지» 일 때만, 그리고 0.4초 넘게
+   움직였을 때만 다시 그린다 — 매 프레임 파이를 새로 그리면 재생이 무거워진다. */
+let pieLastT = -1;
+function xpPieTick(){
+  if(xpModal.hidden || !xpPieLive.checked || !G) return;
+  if(Math.abs(tCur - pieLastT) < 0.4) return;
+  pieLastT = tCur;
+  drawPies(xpKind2.value || 'total', true);
 }
 
 /* ── 오른쪽 파이 ──────────────────────────────────
@@ -425,7 +436,36 @@ function pieBox(title, cls, sl, fmt, jobs){
     + `</div></div>`;
 }
 
-function drawPies(kind){
+/* 합계의 «영웅 몫» 을 재생 시각까지로 되돌린 값 (추정).
+   점수표의 ExperienceContribution 은 경기 최종값 하나뿐이라 되감을 수 없다.
+   대신 그 시각의 항목별 팀 경험치를, 그 항목을 만든 사건 수 비율로 나눈다.
+       est_h = Σ_항목 ( 그 시각 팀 항목 경험치 × 그 항목에서 h 의 사건 몫 )
+   시간 경과는 팀 전체에 붙는 값이라 뺀다 — 실제로 점수표 합과도 그렇게 맞는다
+   (1팀: 팀 경험치 33,871 − 시간 경과 12,995 = 20,876, 점수표 합 20,841).
+   사건이 하나도 없는 항목은 다섯 명에게 고르게 나눈다. */
+function xpShareAt(labs, cutoff, row){
+  const CATS = ['minion','creep','hero','struct'];
+  const cnt = {}; for(const k of CATS) cnt[k] = labs.map(()=>0);
+  labs.forEach((lab,i)=>{
+    for(const k of ((G.raw&&G.raw.kill_anchors||{})[lab]||[])){
+      if(k[0] > cutoff) break;
+      if(k[3]==='minion') cnt.minion[i]++;
+      else if(k[3]==='merc') cnt.creep[i]++;
+      else if(k[3]==='struct') cnt.struct[i]++;
+    }
+    for(const e of G.evs){ if(e.t > cutoff) break;
+      if(e.e==='PlayerDeath' && (e.killers||[]).includes(lab)) cnt.hero[i]++; }
+  });
+  const out = labs.map(()=>0);
+  for(const k of CATS){
+    const pot = (row && row[k]) || 0; if(!pot) continue;
+    const sum = cnt[k].reduce((a,b)=>a+b, 0);
+    labs.forEach((_,i)=> out[i] += pot * (sum ? cnt[k][i]/sum : 1/labs.length));
+  }
+  return out;
+}
+
+function drawPies(kind, live){
   const el = document.getElementById('xpPies');
   if(!el) return;
   if(!G){ el.innerHTML=''; return; }
@@ -433,13 +473,15 @@ function drawPies(kind){
   const jobs = [];
   let h = '';
 
-  // 파이는 경기 전체 기준 — 마지막 표본을 팀별로 집는다
+  // 기준 시각 — «재생 시각까지» 면 tCur, 아니면 경기 끝
+  const cutoff = live ? tCur : Infinity;
   const cur = [null,null];
-  for(const r of (G.teamXp||[])) cur[r.team] = r;
+  for(const r of (G.teamXp||[])) if(r.t <= cutoff) cur[r.team] = r;
+  const stamp = live ? `${fmtT(tCur)} 까지` : '경기 전체';
 
   // 1) 항목 파이 — 합계일 때만. 팀별로 경험치가 어디서 나왔는지.
   if(kind==='total' && (cur[0]||cur[1])){
-    h += `<div class="piegrp"><h4>항목 구성 <em>경험치가 어디서 나왔나</em></h4>`;
+    h += `<div class="piegrp"><h4>항목 구성 <em>${stamp} · 경험치가 어디서 나왔나</em></h4>`;
     for(const tm of [0,1]){
       const c = cur[tm];
       const sl = c ? pieSlices(XP_SUB.map(k=>({ko:XP_KIND[k], n:c[k]||0})),
@@ -453,29 +495,35 @@ function drawPies(kind){
   const sc = (G.raw && G.raw.score) || {};
   const idx = {}; Object.keys(G.players).forEach((k,i)=>{
     const p=G.players[k]; idx[`${p.name}(${p.hero})`]=i; });
+  const labT = [[],[]];
+  for(const lab in G.heroes) labT[G.heroes[lab].team===1?1:0].push(lab);
+  // 합계 + 실시간이면 항목에서 되짚어 추정한다 (점수표는 최종값 하나뿐이라 못 되감는다)
+  const est = (kind==='total' && live)
+    ? [xpShareAt(labT[0], cutoff, cur[0]), xpShareAt(labT[1], cutoff, cur[1])] : null;
   const byTeam = [[],[]];
-  for(const lab in G.heroes){
-    const hh=G.heroes[lab], tm = hh.team===1?1:0;
+  for(const tm of [0,1]) labT[tm].forEach((lab,i)=>{
+    const hh=G.heroes[lab];
     const hd = heroByName(hh.heroName);
     let n = 0;
     if(kind==='total'){
-      n = (sc.ExperienceContribution||[])[idx[lab]] || 0;
+      n = est ? est[tm][i] : ((sc.ExperienceContribution||[])[idx[lab]] || 0);
     }else if(kind==='trickle'){
       n = 0;                                   // 시간 경과는 팀 전체에 붙는다 (영웅 구분 없음)
     }else{
       const s = PIE_SRC[kind];
       if(s && s.td){
-        for(const e of G.evs)
-          if(e.e==='PlayerDeath' && (e.killers||[]).includes(lab)) n++;
+        for(const e of G.evs){ if(e.t > cutoff) break;
+          if(e.e==='PlayerDeath' && (e.killers||[]).includes(lab)) n++; }
       }else if(s){
-        n = s.pick((G.raw&&G.raw.kill_anchors||{})[lab]||[]);
+        n = s.pick(((G.raw&&G.raw.kill_anchors||{})[lab]||[]).filter(k=>k[0]<=cutoff));
       }
     }
     byTeam[tm].push({ ko:hh.heroName, n, ic: hd ? `icons/${hd.icon}` : null });
-  }
-  const src = kind==='total' ? '경험치 기여 (점수표)'
+  });
+  const src = kind==='total' ? (live ? `${stamp} · 항목에서 되짚은 추정값`
+                                     : '경험치 기여 (점수표 · 경기 최종값)')
             : kind==='trickle' ? ''
-            : (PIE_SRC[kind] ? `${PIE_SRC[kind].ko} 수` : '');
+            : (PIE_SRC[kind] ? `${stamp} · ${PIE_SRC[kind].ko} 수` : '');
   if(kind==='trickle'){
     h += `<div class="piegrp"><h4>영웅 몫</h4>
       <p class="pienote">«시간 경과» 경험치는 팀 전체에 붙는 값이라 영웅별로 나뉘지 않습니다.</p></div>`;
@@ -486,9 +534,13 @@ function drawPies(kind){
     if(kind!=='total')
       h += `<p class="pienote">영웅별 «항목 경험치» 는 리플레이에 없습니다 —
             그 항목을 만드는 사건 수로 나눈 비율입니다.</p>`;
+    else if(live)
+      h += `<p class="pienote">점수표의 경험치 기여도는 <b>경기 최종값</b> 하나뿐이라 되감을 수 없습니다.
+            그래서 그 시각의 항목별 팀 경험치를 사건 수 비율로 나눠 <b>추정</b>합니다
+            (시간 경과는 팀 전체 몫이라 뺍니다).</p>`;
     h += `</div>`;
   }
-  h += `<p class="pienote">모두 <b>경기 전체</b> 기준입니다 (옆의 선 그래프와 같은 범위).</p>`;
+  h += `<p class="pienote">파이는 <b>${live?fmtT(tCur)+' 까지':'경기 전체'}</b> 기준입니다.</p>`;
   el.innerHTML = h;
 
   // 남은 높이를 파이 개수로 나눠 크기를 정한다 — 스크롤 없이 다 보이게.
@@ -543,6 +595,7 @@ xpModal.onclick=e=>{ if(e.target===xpModal) closeXpBig(); };
 xpKind2.onchange=drawXpBig;
 xpLvLines.onchange=drawXpBig;
 xpPerTeam.onchange=drawXpBig;
+xpPieLive.onchange=drawXpBig;
 gXpBig.onclick=ev=>{ xpSeek(gXpBig,ev,true); drawXpBig(); };
 window.addEventListener('keydown',e=>{
   // 포커스가 요소가 아닐 수도 있다 (window·document). matches 를 바로 부르면 터진다.
