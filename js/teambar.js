@@ -74,7 +74,7 @@ function buildTeamBar(){
         i.dataset.t = p.t; i.title = `${tier} 레벨 · ${p.ko}`;
         if(p.ic){ const im=document.createElement('img'); im.src='talents/'+p.ic+'.webp'; im.alt=p.ko; i.appendChild(im); }
         else i.classList.add('noic');
-      }else i.title = `${tier} 레벨 · (안 찍음)`;
+      }else { i.title = `${tier} 레벨 · 아직 안 찍음`; i.classList.add('none'); }
       return i;
     };
     const pips = {};
@@ -179,6 +179,8 @@ function updateTeamBar(){
       const i = c.pips[tier]; if(!i) continue;
       const t=i.dataset.t, on = t!==undefined && +t<=tCur;
       if(i.classList.contains('got')!==on) i.classList.toggle('got',on);
+      // 아직 시각이 안 된 칸도 «안 찍음» 으로 본다 (되감으면 다시 ✕ 가 된다)
+      if(i.classList.contains('none')!==!on) i.classList.toggle('none',!on);
       const fresh = on && tCur-+t<3;
       if(i.classList.contains('fresh')!==fresh) i.classList.toggle('fresh',fresh);
       if(on && tier!=='ult') got++;   // ult 는 10레벨 칸의 사본이라 두 번 세지 않는다

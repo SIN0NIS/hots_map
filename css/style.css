@@ -96,6 +96,11 @@ body.mode-replay.has-replay #board{display:flex}
 #board .bdmini .cl{color:var(--gold);font-size:calc(14px * var(--fs))}
 
 #board .bdbody{flex:1;min-height:0;display:flex;gap:8px;padding:4px;overflow:auto}
+/* 선수 카드는 제 폭만 쓴다. 예전에는 카드가 팀 칸 전체로 늘어나 가운데가
+   휑하게 비었다 — 이름 칸 뒤로 250px 넘는 빈 자리가 생겼다. */
+#board .tpanel{align-items:flex-start}
+#board .t1.tpanel{align-items:flex-end}
+#board .pl{width:max-content;min-width:300px}
 /* 가운데 점수 기둥 */
 #board .scorecol{flex:none;width:180px;display:flex;flex-direction:column;align-items:center;gap:5px;
   padding:2px 10px;border-left:1px solid var(--line);border-right:1px solid var(--line);
@@ -140,8 +145,13 @@ body.mode-replay.has-replay #board{display:flex}
 #board .pl .tgrid{display:flex;flex-direction:column;gap:2px;flex:none}
 #board .pl .trow{display:flex;gap:2px}
 #board .t1 .pl .trow{flex-direction:row-reverse}
-#board .pl .tcell{width:19px;height:19px;flex:none;border-radius:3px;overflow:hidden;display:block;
-  border:1px solid var(--line);background:color-mix(in oklab,var(--bg) 45%,transparent);opacity:.35}
+#board .pl .tcell{position:relative;width:19px;height:19px;flex:none;border-radius:3px;
+  overflow:hidden;display:block;border:1px solid var(--line);
+  background:color-mix(in oklab,var(--bg) 45%,transparent);opacity:.45}
+/* 아직 안 찍은 칸은 ✕ 로 «비었다» 는 것을 분명히 한다 (그냥 흐린 네모는 로딩처럼 보인다) */
+#board .pl .tcell.none::after{content:'✕';position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center;color:var(--dim);opacity:.55;
+  font-size:calc(11px * var(--fs));line-height:1}
 #board .pl .tcell img{width:100%;height:100%;display:block}
 #board .pl .tcell.got{opacity:1;border-color:var(--line2);background:var(--panel2)}
 #board .pl .tcell.got.noic{background:var(--gold);border-color:var(--gold)}
@@ -149,9 +159,9 @@ body.mode-replay.has-replay #board{display:flex}
 /* 이름 + 레벨 */
 /* 이름 칸이 남은 자리를 다 먹으면 관전 바처럼 «붙어» 보이지 않는다. 폭을 묶고
    수치 칸만 바깥쪽으로 민다. */
-#board .pl .col{display:flex;flex-direction:column;gap:1px;min-width:0;flex:0 1 96px;
-  width:96px;line-height:1.15}
-#board .t0 .pl .kda{margin-left:auto} #board .t1 .pl .kda{margin-right:auto}
+#board .pl .col{display:flex;flex-direction:column;gap:1px;min-width:0;flex:0 0 84px;
+  width:84px;line-height:1.15}
+#board .pl .kda{margin:0 2px}
 #board .t1 .pl .col{align-items:flex-end}
 #board .pl .hero{font-size:calc(10px * var(--fs));font-weight:500;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
@@ -556,3 +566,16 @@ body.mode-replay:not(.has-replay) #needRep{display:block}
   border:1px solid var(--line);background:color-mix(in oklab,var(--bg) 45%,transparent);opacity:.3}
 .taltbl .tc.got{opacity:1;border-color:var(--line2);background:var(--panel2)}
 .taltbl .tc img{width:100%;height:100%;display:block}
+
+/* 통계·특성 표의 팀 구분줄 */
+.scoretbl tr.tsep td,.taltbl tr.tsep td{background:color-mix(in oklab,var(--bg) 30%,transparent);
+  font-family:inherit;font-size:calc(10px * var(--fs));letter-spacing:.08em;padding:3px 7px;
+  border-bottom:1px solid var(--line2)}
+.scoretbl tr.tsep.b td,.taltbl tr.tsep.b td{color:var(--blue)}
+.scoretbl tr.tsep.r td,.taltbl tr.tsep.r td{color:var(--red)}
+.scoretbl tr.tsep td em,.taltbl tr.tsep td em{font-style:normal;color:var(--dim);margin-left:6px}
+.scoretbl tr.tsep:hover td,.taltbl tr.tsep:hover td{background:color-mix(in oklab,var(--bg) 30%,transparent)}
+/* 특성 표에서 안 찍은 칸 */
+.taltbl .tc.none{position:relative}
+.taltbl .tc.none::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:var(--dim);opacity:.5;font-size:calc(14px * var(--fs))}

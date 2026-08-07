@@ -70,7 +70,13 @@ function scoreHTML(){
     h += `<th class="${scoreSort===c.k?'on':''}${c.extra?' ex':''}" data-k="${c.k}" title="${c.ko} — 눌러서 정렬">`
        + `${c.ic?`<i>${c.ic}</i>`:''}${c.ko}</th>`;
   h += '</tr></thead><tbody>';
+  let lastTeam = null;
   for(const r of rows){
+    if(!scoreSort && r.team !== lastTeam){        // 정렬 중이 아니면 팀별로 묶는다
+      lastTeam = r.team;
+      h += `<tr class="tsep ${r.team?'r':'b'}"><td class="nm" colspan="${cols.length+1}">`
+         + `${r.team?'2팀':'1팀'}</td></tr>`;
+    }
     const hd = heroByName(r.hero);
     h += `<tr class="${r.team?'r':'b'}"><td class="nm">`
        + (hd ? `<img src="icons/${hd.icon}" alt="">` : '')
@@ -95,7 +101,12 @@ function talentHTML(){
   let h = '<table class="taltbl"><thead><tr><th class="nm">선수</th>';
   for(const t of TIER) h += `<th>${t}</th>`;
   h += '</tr></thead><tbody>';
-  for(const c of plCards){
+  // 통계 창처럼 팀별로 묶는다 (1팀 다섯 줄 · 구분줄 · 2팀 다섯 줄)
+  const byTeam = [plCards.filter(c=>c.hh.team!==1), plCards.filter(c=>c.hh.team===1)];
+  for(const [ti, group] of byTeam.entries()){
+    h += `<tr class="tsep ${ti?'r':'b'}"><td class="nm" colspan="${TIER.length+1}">`
+       + `${ti?'2팀':'1팀'} <em>${group.length}명</em></td></tr>`;
+  for(const c of group){
     const hd = heroByName(c.hh.heroName);
     h += `<tr class="${c.hh.team===1?'r':'b'}"><td class="nm">`
        + (hd ? `<img src="icons/${hd.icon}" alt="">` : '')
@@ -104,10 +115,11 @@ function talentHTML(){
       const cell = c.pips[t];
       const img = cell && cell.querySelector('img');
       const on = cell && cell.classList.contains('got');
-      h += `<td><span class="tc ${on?'got':''}" title="${cell?cell.title:''}">`
-         + (img ? `<img src="${img.src}" alt="">` : '') + '</span></td>';
+      h += `<td><span class="tc ${on?'got':'none'}" title="${cell?cell.title:''}">`
+         + (on && img ? `<img src="${img.src}" alt="">` : '') + '</span></td>';
     }
     h += '</tr>';
+  }
   }
   h += '</tbody></table>';
   h += `<p class="spannote">지금 재생 시각까지 찍은 특성만 밝게 나옵니다.
