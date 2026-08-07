@@ -18,10 +18,20 @@ mapSel.onchange=()=>{ if(mapSel.value){ loadMapBySlug(mapSel.value); syncHiResBt
 
 /* 리플레이의 맵 이름(한/영, 샌드박스 표기 포함) -> MAP_DB 항목 */
 function mapNorm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9가-힣]/g,''); }
+/* 리플레이가 적어 준 전장 이름으로 내장 전장을 찾는다.
+   리플레이의 m_title 은 클라이언트 언어를 따르고 «(경쟁전)» 같은 꼬리가 붙기도 한다.
+   그래서 세 단계로 찾는다: 그대로 -> 괄호 꼬리를 뗀 것 -> 부분 일치. */
 function matchMap(name){
-  const n=mapNorm(name);
+  const raw = String(name||'');
+  const cands = [raw, raw.replace(/[([{（【].*$/, ''), raw];
+  for(const c of cands){
+    const n = mapNorm(c);
+    if(!n) continue;
+    for(const m of MAP_DB)
+      if(n===mapNorm(m.ko) || n===mapNorm(m.en) || n===mapNorm(m.slug)) return m;
+  }
+  const n = mapNorm(raw);
   if(!n) return null;
-  for(const m of MAP_DB) if(n===mapNorm(m.ko)||n===mapNorm(m.en)) return m;
   for(const m of MAP_DB) if(n.includes(mapNorm(m.ko))||n.includes(mapNorm(m.en))) return m;
   return null;
 }

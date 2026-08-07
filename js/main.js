@@ -153,7 +153,9 @@ document.getElementById('showStruct').onchange=e=>{ showStruct=e.target.checked;
 document.getElementById('heroIconTgl').onchange=e=>{ showHeroIcons=e.target.checked; markDirty(); };
 
 /* --- 리플레이 로드 --- */
+let unknownMap = '';           // 못 찾은 전장 이름 (없으면 빈 문자열)
 function load(raw){
+  unknownMap = '';
   // 경로를 계산하기 전에 지형부터 올려야 한다 (prepare 안에서 길찾기를 쓴다)
   const mm=matchMap(raw.map);
   if(mm) loadPathing(mm.slug, mm.W, mm.H); else loadPathing('', 0, 0);
@@ -175,20 +177,29 @@ function load(raw){
     if(m.slug!==curMapSlug) loadMapBySlug(m.slug);   // 그림틀·cal 은 여기서 잡는다
     else { cal={...bgAutoCal}; syncCalInputs(); }
   }else{
-    // 뷰어가 모르는 전장 — 리플레이 좌표에 맞춰 틀을 잡는다
+    /* 뷰어가 모르는 전장.
+       예전에는 «배경이 이미 있으면» 아무것도 안 해서, 직전에 보던 전장(대개
+       시작 전장인 저주받은 골짜기)이 그대로 남았다. 좌표계가 전혀 다른 지도 위에
+       영웅이 찍히는데 화면에는 아무 표시도 없어서, 맞는 전장인 줄 알기 쉬웠다.
+       이제는 «틀린 지도를 보여 주느니 안 보여 준다» — 배경을 걷고 리플레이 좌표에
+       맞춰 틀을 다시 잡은 뒤, 어떤 이름을 못 찾았는지 화면에 알린다. */
     setMapLock(false);
-    if(!bgImg){
-      cal = { L:Math.round(G.bounds.minX), R:Math.round(G.bounds.maxX),
-              B:Math.round(G.bounds.minY), T:Math.round(G.bounds.maxY) };
-      setViewBounds(G.bounds); setupCanvas(); fit();
-    }
+    bgImg = null; curMapSlug = '';
+    document.getElementById('mapSel').value = '';
+    cal = { L:Math.round(G.bounds.minX), R:Math.round(G.bounds.maxX),
+            B:Math.round(G.bounds.minY), T:Math.round(G.bounds.maxY) };
+    setViewBounds(G.bounds); setupCanvas(); fit();
     syncCalInputs();
+    unknownMap = raw.map || '(이름 없음)';
   }
   document.body.classList.add('has-replay');
   buildTeamBar(); buildTimeline();      // buildTimeline 이 구조물 주인을 정한다
   fillBoardHead(raw, t0, t1);           // 승리 팀 판정이 그 결과를 쓴다
   setUIMode('replay');            // 리플레이를 열면 바로 재생 화면으로
   markDirty(); renderLog(); updateTeamBar();
+  if(unknownMap)
+    setStatus(`⚠ «${unknownMap}» 은 뷰어에 없는 전장입니다 — 배경 없이 좌표만 그립니다. `
+            + `위 «배경 맵» 에서 비슷한 전장을 직접 고르면 그 위에 얹힙니다.`);
 }
 /* 리플레이 보기에서 전장이 어긋나지 않도록 맵 선택을 잠근다.
    (맵 보기에서는 항상 풀려 있어 자유롭게 전장을 구경할 수 있다) */
@@ -260,7 +271,9 @@ function fillBoardHead(raw, t0, t1){
   document.getElementById('bdMap').textContent = raw.map || '알 수 없는 전장';
   const mins = Math.round((G.maxT||0)/60);
   const sub=document.getElementById('bdSub');
-  sub.textContent = `${fmtT(G.maxT||0)} · 선수 ${(t0.length+t1.length)}명 · 이벤트 ${G.evs.length}건`;
+  sub.textContent = (unknownMap ? `⚠ «${unknownMap}» 전장을 못 찾음 — 배경 없이 좌표만 · ` : '')
+    + `${fmtT(G.maxT||0)} · 선수 ${(t0.length+t1.length)}명 · 이벤트 ${G.evs.length}건`;
+  document.getElementById('bdMap').classList.toggle('warn', !!unknownMap);
   // 리플레이 빌드와 담아 둔 프로토콜이 다르면 값이 조용히 어긋날 수 있다.
   // 지금까지는 문제없이 읽히지만, 이상하면 여기부터 의심하도록 남겨 둔다.
   sub.title = (raw.build && raw.parser_build && raw.build !== raw.parser_build)
