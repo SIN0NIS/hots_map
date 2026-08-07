@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>히오스 전장 기록 재생기 + 전술 보드</title>
-<link rel="stylesheet" href="css/style.css?v=38">
+<link rel="stylesheet" href="css/style.css?v=40">
 </head>
 <body class="mode-map">
 <nav id="modebar" class="frame">
@@ -34,6 +34,8 @@
     </span>
     <span class="tbadge r"><em id="bdWin1" hidden>승리</em><b id="bdName1">2팀</b><i>⚔</i></span>
     <span class="bdmini" id="bdMini"></span>
+    <button id="openScore" class="mini" title="경기 통계 — 킬·어시·죽음·공성딜·영웅딜·치유·보호막·경험치 (S)">📊 통계</button>
+    <button id="openTalent" class="mini" title="특성 한눈에 보기 (T)">🎓 특성</button>
     <button id="bdTgl" title="스코어보드 펼침 / 한 줄 / 숨김 (Tab)">⌄</button>
   </div>
   <div class="bdbody">
@@ -187,6 +189,21 @@
   </section>
 </main>
 
+<!-- 경기 통계 · 특성 -->
+<div id="scoreModal" hidden>
+  <div class="xmbox">
+    <div class="xmhd">
+      <span class="pagetabs" id="scoreTabs">
+        <button class="on" data-s="score">📊 경기 통계</button>
+        <button data-s="talent">🎓 특성</button>
+      </span>
+      <button id="scoreMore" title="곁들여 볼 항목 더 보기">＋ 자세히</button>
+      <button id="scoreClose" title="닫기 (Esc)">✕</button>
+    </div>
+    <div id="scoreBody"></div>
+  </div>
+</div>
+
 <!-- 구간 통계 (참고: SpazzoReplayStatKit 의 타임스탬프 기록) -->
 <div id="spanModal" hidden>
   <div class="xmbox">
@@ -211,26 +228,27 @@
     <div id="lvTable"></div>
   </div>
 </div>
-<script src="js/data_maps.js?v=38"></script>
-  <script src="js/data_levels.js?v=38"></script>
-<script src="js/data_heroes.js?v=38"></script>
-<script src="js/data_abilities.js?v=38"></script>
-<script src="js/data_talents.js?v=38"></script>
-<script src="js/data_samples.js?v=38"></script>
-<script src="js/data_pathing.js?v=38"></script>
-<script src="js/demo_replay.js?v=38"></script>
-<script src="js/py_bundle.js?v=38"></script>
-<script src="js/pathing.js?v=38"></script>
-<script src="js/engine.js?v=38"></script>
-<script src="js/render.js?v=38"></script>
-<script src="js/log.js?v=38"></script>
-<script src="js/teambar.js?v=38"></script>
-<script src="js/timeline.js?v=38"></script>
-<script src="js/stats.js?v=38"></script>
-<script src="js/panzoom.js?v=38"></script>
-<script src="js/tools.js?v=38"></script>
-<script src="js/maps.js?v=38"></script>
-<script src="js/parser.js?v=38"></script>
-<script src="js/main.js?v=38"></script>
+<script src="js/data_maps.js?v=40"></script>
+  <script src="js/data_levels.js?v=40"></script>
+<script src="js/data_heroes.js?v=40"></script>
+<script src="js/data_abilities.js?v=40"></script>
+<script src="js/data_talents.js?v=40"></script>
+<script src="js/data_samples.js?v=40"></script>
+<script src="js/data_pathing.js?v=40"></script>
+<script src="js/demo_replay.js?v=40"></script>
+<script src="js/py_bundle.js?v=40"></script>
+<script src="js/pathing.js?v=40"></script>
+<script src="js/engine.js?v=40"></script>
+<script src="js/render.js?v=40"></script>
+<script src="js/log.js?v=40"></script>
+<script src="js/teambar.js?v=40"></script>
+<script src="js/timeline.js?v=40"></script>
+<script src="js/stats.js?v=40"></script>
+<script src="js/score.js?v=40"></script>
+<script src="js/panzoom.js?v=40"></script>
+<script src="js/tools.js?v=40"></script>
+<script src="js/maps.js?v=40"></script>
+<script src="js/parser.js?v=40"></script>
+<script src="js/main.js?v=40"></script>
 </body>
 </html>

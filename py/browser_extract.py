@@ -96,6 +96,23 @@ def extract(path):
 
     tracker = list(protocol.decode_replay_tracker_events(archive.read_file("replay.tracker.events")))
 
+    # 경기 종료 점수표. 게임의 «종료 화면» 에 뜨는 값이 그대로 들어 있다 —
+    # 영웅 피해량·공성 피해량·치유량·보호막·경험치 기여도까지 134개 항목이고
+    # 그중 74개가 실제로 채워진다. 리플레이 하나에 딱 한 번 나온다.
+    # (오래 «없다» 고 알고 있었는데 SStatGameEvent 만 뒤져서 놓치고 있었다.)
+    score = {}
+    for ev in tracker:
+        if ev["_event"] != "NNet.Replay.Tracker.SScoreResultEvent":
+            continue
+        for it in ev.get("m_instanceList") or []:
+            name = ds(it.get("m_name"))
+            vals = []
+            for v in it.get("m_values") or []:
+                vals.append(v[0].get("m_value") if v and isinstance(v[0], dict) else None)
+            if any(x for x in vals[:10]):
+                score[name] = vals[:10]
+        break
+
     # 게임 시계의 0:00 은 «성문이 열리는 순간» 이다. 그 전은 준비 시간이라
     # 게임 내 시계에 안 잡힌다. 예전에는 gameloop//16 을 그대로 써서 화면의
     # 모든 시각이 실제보다 빨랐다 — 정식 전장 38초, 난투 전장 75초 (실측).
@@ -293,6 +310,8 @@ def extract(path):
         # 재생구슬 획득 시각 [초, ...] · 총 사망 시간(초)
         "globes": {pname(pid): v for pid, v in globes.items()},
         "dead_time": {pname(pid): v for pid, v in dead_time.items()},
+        # 경기 종료 점수표 {항목: [선수1..10 값]} — 순서는 players 와 같다
+        "score": score,
         "team_xp": sorted(team_xp, key=lambda r: (r["t"], r["team"])),
         # 분 단위 명령 수 (APM). {"이름(영웅)": {"0": 42, "1": 55, ...}}
         "apm": {pname(uid + 1): {str(m): n for m, n in sorted(b.items())}

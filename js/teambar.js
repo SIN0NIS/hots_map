@@ -78,46 +78,31 @@ function buildTeamBar(){
       return i;
     };
     const pips = {};
-    const early = document.createElement('span'); early.className='tside early';
-    for(const tier of [1,4,7]){ const c=mkTal(tier); pips[tier]=c; early.appendChild(c); }
-    const late  = document.createElement('span'); late.className='tside late';
-    for(const tier of [13,16,20]){ const c=mkTal(tier); pips[tier]=c; late.appendChild(c); }
+    // 특성 두 줄 — 위 1·4·7·10, 아래 13·16·20 (관전 바와 같다)
+    const tg = document.createElement('span'); tg.className='tgrid';
+    for(const tiers of [[1,4,7,10],[13,16,20]]){
+      const rw = document.createElement('span'); rw.className='trow';
+      for(const tier of tiers){ const c=mkTal(tier); pips[tier]=c; rw.appendChild(c); }
+      tg.appendChild(rw);
+    }
 
-    // 초상화 + 궁극기(10레벨)
+    // 초상화 + 궁극기(10레벨). 궁극기 칸은 특성 줄에도 있고 초상화에도 겹쳐 붙는다.
     const who = document.createElement('button');
     who.type='button'; who.className='who'; who.title=lab;
     const por = document.createElement('span'); por.className='por';
     const psrc = ad && ad.p ? 'portraits/'+ad.p+'.webp' : (hd ? 'icons/'+hd.icon : '');
     if(psrc){ const im=document.createElement('img'); im.src=psrc; im.alt=hh.heroName; por.appendChild(im); }
     const ult = mkTal(10); ult.classList.add('ult'); por.appendChild(ult);
-    pips[10] = ult;
+    pips.ult = ult;                       // 초상화 쪽 사본 (같은 티어를 둘 다 켠다)
     who.appendChild(por);
 
-    // 이름
-    const nc = document.createElement('span'); nc.className='nmcol';
+    // 이름 + 최근 스킬
+    const nc = document.createElement('span'); nc.className='col';
     const hn = document.createElement('span'); hn.className='hero'; hn.textContent=hh.heroName;
     const un = document.createElement('span'); un.className='user';
     un.textContent = lab.replace(/\(.*\)$/,'').trim() || lab;
     nc.append(hn,un);
 
-    /* 스킬 줄 — 아이콘·이름·기본 쿨타임은 게임 데이터라 정확하다.
-       다만 «지금 이 스킬이 쿨인가» 는 알 수 없다. 리플레이의 스킬 사용 기록은
-       내부 번호(abilLink)뿐이고, 그 번호가 Q/W/E 중 무엇인지 리플레이만으로는
-       못 가린다 (쿨타임 지문으로 맞춰 보니 60% — 10개 중 4개가 엉뚱한 스킬이 된다).
-       그래서 «무엇을 쓸 수 있나»만 보여 주고, 방금 쓴 것은 아래 슬롯 표시로 낸다. */
-    const sk = document.createElement('span'); sk.className='skrow';
-    for(const s of (ad && ad.sk || []).filter(s=>['Q','W','E','Trait'].includes(s.s)).slice(0,4)){
-      const u = document.createElement('u');
-      const im = document.createElement('img'); im.src='abilities/'+s.i+'.webp'; im.alt=s.n;
-      u.appendChild(im);
-      const k = document.createElement('b'); k.textContent = s.s==='Trait' ? 'D' : s.s;
-      u.appendChild(k);
-      if(s.cd){ const c=document.createElement('em'); c.textContent=s.cd+'초'; u.appendChild(c); }
-      u.title = `${s.s==='Trait'?'D':s.s} · ${s.n}` + (s.cd?` · 기본 재사용 대기시간 ${s.cd}초`:'');
-      sk.appendChild(u);
-    }
-
-    // 최근에 쓴 스킬 — 번호를 처음 쓴 순서로 칸에 배정한다 (어느 스킬인지는 모른다)
     const casts = (hh.pts||[]).filter(p=>p.src==='a' && p.link!=null && !SHARED_ABIL.has(p.link));
     const order = [];
     for(const c of casts) if(!order.includes(c.link) && order.length<SK_SLOTS) order.push(c.link);
@@ -127,16 +112,17 @@ function buildTeamBar(){
       u.title=`스킬 ${i+1} (내부 번호 ${lk}) · ${casts.filter(c=>c.link===lk).length}회 사용`;
       bars.appendChild(u); return {el:u, link:lk};
     });
+    nc.appendChild(bars);
+
+    const lvEl = document.createElement('span'); lvEl.className='plv'; lvEl.textContent='1';
 
     const kda=document.createElement('span'); kda.className='kda';
 
-    const col = document.createElement('span'); col.className='col';
-    col.append(nc, sk, bars);
-    if(team===0) row.append(early, who, col, late, kda);
-    else         row.append(kda, late, col, who, early);
+    if(team===0) row.append(who, tg, nc, lvEl, kda);
+    else         row.append(kda, lvEl, nc, tg, who);
 
     teamEls[team].appendChild(row);
-    const card = {lab, card:row, pips, hh, slots, kda, lv:1,
+    const card = {lab, card:row, pips, hh, slots, kda, lvEl, lv:1,
                   casts: casts.map(c=>({t:c.t, link:c.link})),
                   levels: levels[lab]||[]};
     who.onclick = ()=>{ selPlayer = (selPlayer===lab) ? null : lab; applySel(); };
@@ -189,18 +175,19 @@ function updateTeamBar(){
     const dead = !!(p && p.dead);
     if(c.card.classList.contains('dead')!==dead) c.card.classList.toggle('dead',dead);
     let got=0;
-    for(const tier of TIERS){
+    for(const tier of TIERS.concat(['ult'])){
       const i = c.pips[tier]; if(!i) continue;
       const t=i.dataset.t, on = t!==undefined && +t<=tCur;
       if(i.classList.contains('got')!==on) i.classList.toggle('got',on);
       const fresh = on && tCur-+t<3;
       if(i.classList.contains('fresh')!==fresh) i.classList.toggle('fresh',fresh);
-      if(on) got++;
+      if(on && tier!=='ult') got++;   // ult 는 10레벨 칸의 사본이라 두 번 세지 않는다
     }
     let lv=1;
     if(c.levels.length){ for(const L of c.levels){ if(L.t<=tCur) lv=L.lv; else break; } }
     else if(got) lv=TIERS[got-1];
     c.lv=lv;
+    if(c.lvEl && c.lvEl.textContent!==String(lv)) c.lvEl.textContent=lv;
     c.card.title = `${c.lab} · 레벨 ${lv}`;
     // 최근에 쓴 스킬
     const hot=new Set();
