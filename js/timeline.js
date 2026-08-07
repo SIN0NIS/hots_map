@@ -107,6 +107,8 @@ function buildTimeline(){
     }
     const tm = eventTeam(e, G.players);
     if(tm!==0 && tm!==1) continue;
+    // 건물은 파괴자가 거의 안 남아 진영 위치로 팀을 추론한다 — 그 표식은 빨간 점선
+    const guessed = cat==='struct' && !(e.killers && e.killers.length);
     const sz = Math.round(9 + evWeight(e)*2.6);
     const m = document.createElement('button');
     m.type='button';
@@ -115,7 +117,9 @@ function buildTimeline(){
     m.style.left = (e.t/T*100)+'%';
     m.style.width = m.style.height = sz+'px';
     m.style.fontSize = Math.max(7, Math.round(sz*0.62))+'px';
-    m.title = fmtT(e.t)+' · '+evText(e, G.players);
+    m.title = fmtT(e.t)+' · '+evText(e, G.players)
+            + (guessed ? ' — 부순 팀은 진영 위치로 추론한 추정치입니다' : '');
+    if(guessed) m.classList.add('est');
     m.onpointerdown = ev=>{ ev.stopPropagation(); selEvent=e; seekTo(e.t); updateTimeline(); };
     tlRows[tm].appendChild(m);
     tlMarks.push({el:m, t:e.t, e});
@@ -520,24 +524,27 @@ function drawPies(kind, live){
     }
     byTeam[tm].push({ ko:hh.heroName, n, ic: hd ? `icons/${hd.icon}` : null });
   });
-  const src = kind==='total' ? (live ? `${stamp} · 항목에서 되짚은 추정값`
+  // 리플레이에 그대로 있는 값인가, 추론해 채운 값인가
+  const guess = kind!=='total' || live;
+  const src = kind==='total' ? (live ? `${stamp} · 항목에서 되짚은 값${estB(EST_WHY.pieLive)}`
                                      : '경험치 기여 (점수표 · 경기 최종값)')
             : kind==='trickle' ? ''
-            : (PIE_SRC[kind] ? `${stamp} · ${PIE_SRC[kind].ko} 수` : '');
+            : (PIE_SRC[kind] ? `${stamp} · ${PIE_SRC[kind].ko} 수${estB(EST_WHY.pie)}` : '');
   if(kind==='trickle'){
     h += `<div class="piegrp"><h4>영웅 몫</h4>
       <p class="pienote">«시간 경과» 경험치는 팀 전체에 붙는 값이라 영웅별로 나뉘지 않습니다.</p></div>`;
   }else{
     h += `<div class="piegrp"><h4>영웅 몫 <em>${src}</em></h4>`;
     for(const tm of [0,1])
-      h += pieBox(`${tm+1}팀`, tm?'r':'b', pieSlices(byTeam[tm], heroColors(tm)), num, jobs);
+      h += pieBox(`${tm+1}팀${guess?estB(EST_WHY.pie):''}`, tm?'r':'b',
+                  pieSlices(byTeam[tm], heroColors(tm)), num, jobs);
     if(kind!=='total')
-      h += `<p class="pienote">영웅별 «항목 경험치» 는 리플레이에 없습니다 —
-            그 항목을 만드는 사건 수로 나눈 비율입니다.</p>`;
+      h += `<p class="pienote est">영웅별 «항목 경험치» 는 리플레이에 없습니다 —
+            그 항목을 만드는 사건 수로 나눈 <b>추정치</b>입니다.</p>`;
     else if(live)
-      h += `<p class="pienote">점수표의 경험치 기여도는 <b>경기 최종값</b> 하나뿐이라 되감을 수 없습니다.
-            그래서 그 시각의 항목별 팀 경험치를 사건 수 비율로 나눠 <b>추정</b>합니다
-            (시간 경과는 팀 전체 몫이라 뺍니다).</p>`;
+      h += `<p class="pienote est">점수표의 경험치 기여도는 <b>경기 최종값</b> 하나뿐이라 되감을 수 없습니다.
+            그 시각의 항목별 팀 경험치를 사건 수 비율로 나눈 <b>추정치</b>입니다
+            (시간 경과는 팀 전체 몫이라 뺍니다 · 검증 오차 평균 2.0%p).</p>`;
     h += `</div>`;
   }
   h += `<p class="pienote">파이는 <b>${live?fmtT(tCur)+' 까지':'경기 전체'}</b> 기준입니다.</p>`;
@@ -570,12 +577,12 @@ function drawLvTable(){
   for(const k in LEVEL_XP){
     const L=+k, v=lvXp(L), rg=lvXpRange(L);
     const on = L===lvNow[0]+1 || L===lvNow[1]+1;
-    out.push(`<span class="${on?'on':''}" title="표본에서 잡은 구간 ${rg[0].toLocaleString()} ~ ${rg[1].toLocaleString()} — 실제 문턱은 이 사이에 있습니다">`+
+    out.push(`<span class="est ${on?'on':''}" title="표본에서 잡은 구간 ${rg[0].toLocaleString()} ~ ${rg[1].toLocaleString()} — 실제 문턱은 이 사이에 있습니다">`+
              `Lv${L} ${v.toLocaleString()}+</span>`);
   }
   const left = i=>{ if(now[i]==null) return ''; const nx=lvXp(lvNow[i]+1);
     return nx==null?'':`${i+1}팀 다음 레벨까지 약 ${Math.max(0,Math.round(nx-now[i])).toLocaleString()}`; };
-  out.push(`<span class="note">문턱값은 표본 리플레이 8판에서 뽑은 <b>하한</b>입니다 `+
+  out.push(`<span class="note est">${estB(EST_WHY.lvxp)} 문턱값은 표본 리플레이 8판에서 뽑은 <b>하한</b>입니다 `+
            `— 리플레이에 30초 간격 표본만 남아, 실제 문턱은 이 값보다 조금 위입니다 (칸에 마우스를 올리면 구간). `+
            `${left(0)} · ${left(1)}</span>`);
   lvTable.innerHTML=out.join('');

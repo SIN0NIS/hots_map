@@ -143,7 +143,8 @@ function spanHTML(a, b){
   let h = `<table class="spanteam"><thead><tr><th class="b">1팀</th><th></th><th class="r">2팀</th></tr></thead><tbody>`;
   h += row('처치', kills[0], kills[1]);
   h += row('사망', deaths[0], deaths[1]);
-  h += row('건물', structs[0], structs[1], '포탑·요새·성채·핵');
+  // 어느 팀이 부쉈는지는 진영 위치로 추론한 값이다 (리플레이에 파괴자가 거의 없다)
+  h += row(`건물${estB(EST_WHY.struct)}`, structs[0], structs[1], '포탑·요새·성채·핵');
   h += row('용병', camps[0], camps[1]);
   h += row('목표', objs[0], objs[1]);
   if(xp[0] && xp[1]){
@@ -163,7 +164,7 @@ function spanHTML(a, b){
   }
   rows.sort((p, q) => p.team - q.team || q.s.td - p.s.td);
   h += `<table class="spanpl"><thead><tr><th>선수</th><th>관여</th><th>데스</th>`
-     + `<th>미니언</th><th>용병</th><th>건물</th><th>구슬</th><th>APM</th><th>사망</th></tr></thead><tbody>`;
+     + `<th>미니언</th><th>용병</th><th>건물</th><th>구슬</th><th class="est" title="${EST_WHY.apm}">APM<u class="estb">추정치</u></th><th>사망</th></tr></thead><tbody>`;
   for(const r of rows){
     const hd = heroByName(r.hero);
     h += `<tr class="${r.team ? 'r' : 'b'}"><td class="nm">`

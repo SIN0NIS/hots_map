@@ -281,6 +281,21 @@ function nameHTML(label, players){
   const ic=hd?`<img class="li" src="icons/${hd.icon}" alt="">`:'';
   return `<b class="${t===0?'b':t===1?'r':'g'}">${ic}${label}</b>`;
 }
+/* 추정치 딱지 — 리플레이에 없어서 추론한 값 옆에 붙인다 */
+function estB(why){ return `<u class="estb" title="${why}">추정치</u>`; }
+const EST_WHY = {
+  struct: '리플레이는 건물을 «누가» 부쉈는지 거의 남기지 않습니다 (실측 39건 중 4건). '
+        + '건물이 붙어 있는 진영으로 부순 팀을 추론한 값입니다.',
+  pos:    '위치는 15초 간격 스냅샷과 이동·조준 명령으로 되살린 값입니다. '
+        + '표본 검증 오차 평균 5.1 · 중앙값 3.7 타일.',
+  lvxp:   '레벨 문턱값은 리플레이에 없습니다. 표본 8판의 30초 간격 기록에서 뽑은 하한입니다.',
+  pie:    '영웅별 «항목 경험치» 는 리플레이에 없습니다. 그 항목을 만든 사건 수로 나눈 비율입니다.',
+  pieLive:'점수표의 경험치 기여도는 경기 최종값 하나뿐입니다. '
+        + '그 시각의 항목별 팀 경험치를 사건 수 비율로 나눈 값입니다 (검증 오차 평균 2.0%p).',
+  apm:    'APM 은 분 단위로만 남습니다. 구간에 걸친 분들의 평균으로 어림한 값입니다.',
+  lvfall: '경험치 기록이 없어 선수들의 최고 레벨로 어림한 값입니다.',
+};
+
 function evHTML(e, players){
   const tm = v => v==null?null:(Math.round(v)===1?0:1);
   let ic='•', body='';
@@ -292,7 +307,10 @@ function evHTML(e, players){
       const k=(typeof structKind==='function')?structKind(e.UnitType||e.unit)
               :{ko:(e.UnitType||e.unit||'건물').replace(/^Town/,''), ic:'🏰'};
       ic=k.ic;
-      body=`<b class="g">${k.ko}</b> 파괴` + (e.killers?` <span class="dim">←</span> `+e.killers.map(k=>nameHTML(k,players)).join(', '):''); break; }
+      body=`<b class="g">${k.ko}</b> 파괴`
+         + (e.killers && e.killers.length
+              ? ` <span class="dim">←</span> `+e.killers.map(k=>nameHTML(k,players)).join(', ')
+              : estB(EST_WHY.struct)); break; }
     case 'merc':{ ic='⚔️'; body=`${span((e.CampType||'용병'), tm(e.TeamID))} 점령 <span class="dim">(캠프 ${e.CampID??'?'} · ${tm(e.TeamID)===0?'1팀':'2팀'})</span>`; break; }
     case 'obj':{ ic='🪶'; body=`<b class="g">${e.e}</b>` + (e.TeamID?` <span class="dim">${tm(e.TeamID)===0?'1팀':'2팀'}</span>`:''); break; }
     case 'grow':{ ic='⬆';

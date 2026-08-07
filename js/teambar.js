@@ -273,8 +273,11 @@ function updateScore(){
   // 팀 레벨은 경험치 표본이 정확하다. 없으면 선수 최고 레벨로 어림한다.
   const lv=[1,1];
   for(const r of (G.teamXp||[])) if(r.t<=tCur) lv[r.team]=r.lv;
-  if(!(G.teamXp||[]).length)
+  const lvGuess = !(G.teamXp||[]).length;    // 경험치 기록이 없으면 선수 레벨로 어림한다
+  if(lvGuess)
     for(const c of plCards) lv[c.hh.team===1?1:0]=Math.max(lv[c.hh.team===1?1:0], c.lv||1);
+  for(const el of tLv){ el.classList.toggle('est', lvGuess);
+    if(lvGuess) el.title = EST_WHY.lvfall; }
   const k=[0,0], s=[0,0];
   for(const e of G.evs){
     if(e.t>tCur) break;

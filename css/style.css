@@ -618,3 +618,18 @@ body.mode-replay:not(.has-replay) #needRep{display:block}
 .taltbl .tc.none{position:relative}
 .taltbl .tc.none::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;
   justify-content:center;color:var(--dim);opacity:.5;font-size:calc(14px * var(--fs))}
+
+/* ── 추정치 표시 ────────────────────────────────────────────────────
+   리플레이에 그대로 들어 있는 값과, 없어서 추론해 채운 값을 눈으로 갈라 준다.
+   추론한 것은 빨간색 + «추정치» 딱지. 딱지에 마우스를 올리면 근거가 나온다. */
+.est{color:var(--red)}
+.estb{display:inline-block;font-style:normal;text-decoration:none;font-weight:600;
+  font-size:calc(8px * var(--fs));line-height:1.5;letter-spacing:.03em;vertical-align:middle;
+  color:var(--red);border:1px solid color-mix(in oklab,var(--red) 50%,transparent);
+  border-radius:3px;padding:0 3px;margin-left:4px;cursor:help;
+  background:color-mix(in oklab,var(--red) 13%,transparent)}
+.pienote.est{color:var(--red);opacity:1}
+#lvTable span.est{color:var(--red);border-color:color-mix(in oklab,var(--red) 35%,transparent)}
+/* 파괴자를 진영 위치로 추론한 건물 표식 — 빨간 점선 테두리 */
+.tlmark.est{outline:1px dashed color-mix(in oklab,var(--red) 70%,transparent);outline-offset:1px}
+#calbar .estb{margin-left:2px}
