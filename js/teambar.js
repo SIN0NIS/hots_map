@@ -126,7 +126,7 @@ function applySel(){
 /* --- 통계 페이지 (참고: SpazzoReplayStatKit 의 Control+1~6 방식) --- */
 let statPage='tal';
 const pageTabs=document.getElementById('pageTabs');
-const PAGE_KO={tal:'특성', kda:'관여', apm:'APM', xp:'XP'};
+const PAGE_KO={tal:'특성', kda:'관여', cs:'파밍', apm:'APM', xp:'XP'};
 pageTabs.querySelectorAll('button').forEach(b=>b.onclick=()=>{
   statPage=b.dataset.p;
   pageTabs.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
@@ -208,6 +208,16 @@ function fillStats(){
     }else if(statPage==='kda'){
       const v=kda[c.lab]||{td:0,d:0};
       h=`<b><s class="k">${v.td}</s> / <s class="d">${v.d}</s></b><em>관여/데스</em>`;
+    }else if(statPage==='cs'){
+      // 지금 시각까지 «막타로 잡은 것» 과 «주운 재생구슬». 둘 다 시각이 붙어 있어
+      // 되감아도 그때까지의 값이 나온다.
+      const ka=(G.raw&&G.raw.kill_anchors||{})[c.lab]||[];
+      let cs=0, mc=0;
+      for(const k of ka){ if(k[0]>tCur) break;
+        if(k[3]==='minion') cs++; else if(k[3]==='merc') mc++; }
+      let gl=0;
+      for(const t of ((G.raw&&G.raw.globes||{})[c.lab]||[])){ if(t>tCur) break; gl++; }
+      h=`<b>${cs}</b><em>미니언${mc?' · 용병 '+mc:''} · 구슬 ${gl}</em>`;
     }else if(statPage==='apm'){
       const b=(G.apm||{})[c.lab]||{};
       let tot=0; for(const m in b){ if(+m<min) tot+=b[m]; }

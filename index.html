@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>히오스 전장 기록 재생기 + 전술 보드</title>
-<link rel="stylesheet" href="css/style.css?v=35">
+<link rel="stylesheet" href="css/style.css?v=37">
 </head>
 <body class="mode-map">
 <nav id="modebar" class="frame">
@@ -54,6 +54,7 @@
       <div class="pagetabs" id="pageTabs">
         <button class="on" data-p="tal" title="특성만 보기">특성</button>
         <button data-p="kda" title="처치 관여 · 데스 (리플레이는 막타를 구분하지 않아 «관여»로 센다)">관여</button>
+        <button data-p="cs" title="지금까지 잡은 미니언 · 용병 · 재생구슬">파밍</button>
         <button data-p="apm" title="APM · 죽어 있던 시간">APM</button>
         <button data-p="xp" title="경험치 총량">XP</button>
       </div>
@@ -170,15 +171,30 @@
       <button class="spd on" data-s="4">×4</button>
       <button class="spd" data-s="8">×8</button>
       <button class="spd" data-s="16">×16</button>
+      <span class="csep"></span>
+      <button class="evnav" id="spanA" title="구간 시작을 지금 시각에 찍는다 ( [ )">⟦</button>
+      <button class="evnav" id="spanB" title="구간 끝을 지금 시각에 찍는다 ( ] )">⟧</button>
+      <button class="evnav" id="spanGo" title="찍은 구간의 통계를 본다 ( \ )">Σ 구간</button>
+      <button class="evnav" id="spanClear" title="구간 표시 지우기">✕</button>
     </div>
     <div class="tlwrap">
       <div class="tlrow t0"><span class="tag">1팀</span><div class="track" id="tl0"></div></div>
       <div class="tlaxis" id="tlAxis"></div>
       <div class="tlrow t1"><span class="tag">2팀</span><div class="track" id="tl1"></div></div>
+      <div class="spanband" id="spanBand" hidden></div>
       <div class="tlnow" id="tlNow"></div>
     </div>
   </section>
 </main>
+
+<!-- 구간 통계 (참고: SpazzoReplayStatKit 의 타임스탬프 기록) -->
+<div id="spanModal" hidden>
+  <div class="xmbox">
+    <div class="xmhd"><b>구간 통계</b><span id="spanTitle"></span>
+      <button id="spanClose" title="닫기 (Esc)">✕</button></div>
+    <div id="spanBody"></div>
+  </div>
+</div>
 
 <!-- 경험치 그래프 크게 보기 -->
 <div id="xpModal" hidden>
@@ -195,24 +211,25 @@
     <div id="lvTable"></div>
   </div>
 </div>
-<script src="js/data_maps.js?v=35"></script>
-  <script src="js/data_levels.js?v=35"></script>
-<script src="js/data_heroes.js?v=35"></script>
-<script src="js/data_talents.js?v=35"></script>
-<script src="js/data_samples.js?v=35"></script>
-<script src="js/data_pathing.js?v=35"></script>
-<script src="js/demo_replay.js?v=35"></script>
-<script src="js/py_bundle.js?v=35"></script>
-<script src="js/pathing.js?v=35"></script>
-<script src="js/engine.js?v=35"></script>
-<script src="js/render.js?v=35"></script>
-<script src="js/log.js?v=35"></script>
-<script src="js/teambar.js?v=35"></script>
-<script src="js/timeline.js?v=35"></script>
-<script src="js/panzoom.js?v=35"></script>
-<script src="js/tools.js?v=35"></script>
-<script src="js/maps.js?v=35"></script>
-<script src="js/parser.js?v=35"></script>
-<script src="js/main.js?v=35"></script>
+<script src="js/data_maps.js?v=37"></script>
+  <script src="js/data_levels.js?v=37"></script>
+<script src="js/data_heroes.js?v=37"></script>
+<script src="js/data_talents.js?v=37"></script>
+<script src="js/data_samples.js?v=37"></script>
+<script src="js/data_pathing.js?v=37"></script>
+<script src="js/demo_replay.js?v=37"></script>
+<script src="js/py_bundle.js?v=37"></script>
+<script src="js/pathing.js?v=37"></script>
+<script src="js/engine.js?v=37"></script>
+<script src="js/render.js?v=37"></script>
+<script src="js/log.js?v=37"></script>
+<script src="js/teambar.js?v=37"></script>
+<script src="js/timeline.js?v=37"></script>
+<script src="js/stats.js?v=37"></script>
+<script src="js/panzoom.js?v=37"></script>
+<script src="js/tools.js?v=37"></script>
+<script src="js/maps.js?v=37"></script>
+<script src="js/parser.js?v=37"></script>
+<script src="js/main.js?v=37"></script>
 </body>
 </html>

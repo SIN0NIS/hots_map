@@ -74,6 +74,10 @@ def extract(path):
     # 그래서 미니언 궤적을 따로 복원할 필요가 전혀 없다 — 죽은 자리가 곧 관측점이다.
     # 잡은 영웅은 그 순간 그 자리에서 사거리 안에 있었다.
     kill_anchor = defaultdict(list)   # pid -> [초, x, y, 종류]
+    # 구간 통계용 «시각이 붙은» 개인 사건. 재생구슬은 좌표가 없어 앵커로는 못 쓰지만
+    # «언제 몇 개 먹었나» 는 구간 비교에 쓸모가 있다.
+    globes = defaultdict(list)        # pid -> [초, ...]
+    dead_time = {}                    # pid -> 총 사망 시간(초)
     team_xp = []                   # 팀별 레벨·경험치 시계열 (그래프용)
 
     # 플레이어의 «본체» 영웅 유닛만 추적한다.
@@ -164,7 +168,16 @@ def extract(path):
 
         elif et == "NNet.Replay.Tracker.SStatGameEvent":
             name = ds(ev["m_eventName"])
-            if name == "PeriodicXPBreakdown":
+            if name == "RegenGlobePickedUp":
+                pid = {ds(s["m_key"]): s["m_value"]
+                       for s in (ev.get("m_intData") or [])}.get("PlayerID")
+                if pid: globes[pid].append(sec)
+            elif name == "EndOfGameTimeSpentDead":
+                iv = {ds(s["m_key"]): s["m_value"] for s in (ev.get("m_intData") or [])}
+                fv = {ds(s["m_key"]): s["m_value"] / 4096.0
+                      for s in (ev.get("m_fixedData") or [])}
+                if iv.get("PlayerID"): dead_time[iv["PlayerID"]] = round(fv.get("Time", 0), 1)
+            elif name == "PeriodicXPBreakdown":
                 # 팀별 레벨·경험치 시계열. 그래프에 쓴다 (타임라인에는 안 넣는다).
                 ints = {ds(s["m_key"]): s["m_value"] for s in (ev.get("m_intData") or [])}
                 fixed = {ds(s["m_key"]): s["m_value"] / 4096.0
@@ -277,6 +290,9 @@ def extract(path):
         "attack_moves": {pname(uid + 1): pts for uid, pts in amoves.items()},
         # 잡은 것 = 위치 앵커. [초, x, y, 종류] · 종류 minion/merc/struct/hero
         "kill_anchors": {pname(pid): v for pid, v in kill_anchor.items()},
+        # 재생구슬 획득 시각 [초, ...] · 총 사망 시간(초)
+        "globes": {pname(pid): v for pid, v in globes.items()},
+        "dead_time": {pname(pid): v for pid, v in dead_time.items()},
         "team_xp": sorted(team_xp, key=lambda r: (r["t"], r["team"])),
         # 분 단위 명령 수 (APM). {"이름(영웅)": {"0": 42, "1": 55, ...}}
         "apm": {pname(uid + 1): {str(m): n for m, n in sorted(b.items())}

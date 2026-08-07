@@ -55,6 +55,7 @@ function prepare(raw){
   for(const e of (raw.timeline||[])) if(e.e==='EndOfGameXPBreakdown' && e.player)
     xpEnd[e.player]=(e.MinionXP||0)+(e.CreepXP||0)+(e.StructureXP||0)+(e.HeroXP||0)+(e.TrickleXP||0);
   const out = { players, heroes, evs, maxT, structures, teamXp: raw.team_xp||[],
+    raw,                        // 구간 통계가 원본의 막타·구슬 목록을 그대로 쓴다
     apm: raw.apm||{}, xpEnd,
     bounds:{minX:minX-6,maxX:maxX+6,minY:minY-6,maxY:maxY+6} };
   for(const lab in heroes){

@@ -166,6 +166,7 @@ function updateTimeline(){
   tlNowEl.style.left = (tr.left-par.left + tCur/G.maxT*tr.width)+'px';
   const pct = Math.max(0, Math.min(100, tCur/G.maxT*100)) + '%';
   for(const r of tlRows) r.style.setProperty('--prog', pct);
+  if(typeof drawSpanBand==='function') drawSpanBand();
   for(const m of tlMarks){
     const future = m.t > tCur;
     if(m.el.classList.contains('future')!==future) m.el.classList.toggle('future',future);
@@ -356,7 +357,8 @@ xpLvLines.onchange=drawXpBig;
 xpPerTeam.onchange=drawXpBig;
 gXpBig.onclick=ev=>{ xpSeek(gXpBig,ev,true); drawXpBig(); };
 window.addEventListener('keydown',e=>{
-  if(e.target.matches('input,select,textarea')) return;
+  // 포커스가 요소가 아닐 수도 있다 (window·document). matches 를 바로 부르면 터진다.
+  if(typeof isTypingTarget==='function' && isTypingTarget()) return;
   if(e.key==='Escape'){ if(!xpModal.hidden){ closeXpBig(); e.stopPropagation(); } }
   else if((e.key==='g'||e.key==='G') && G){ xpModal.hidden?openXpBig():closeXpBig(); }
 });
