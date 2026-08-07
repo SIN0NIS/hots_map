@@ -316,7 +316,121 @@ function drawXpBig(){
   const kind = xpKind2.value || 'total';
   drawXpOn(gXpBig, {kind, big:true, lvLines:xpLvLines.checked, perTeam:xpPerTeam.checked});
   xpLegend2.innerHTML = xpLegendHTML(kind, true);
+  drawPies(kind);
   drawLvTable();
+}
+
+/* ── 오른쪽 파이 ────────────────────────────────────────────────────
+   선 그래프는 «흐름» 을, 파이는 «지금 무엇이/누가 얼마나» 를 맡는다.
+   항목별 선을 여러 개 겹쳐 놓으면 어느 쪽이 큰지 읽기 어렵기 때문이다.
+
+     합계   항목 파이 (팀별) + 영웅 파이 (팀별)
+     항목   영웅 파이만
+
+   영웅 파이의 근거가 둘로 나뉜다 —
+     합계는 점수표의 ExperienceContribution 이라 «진짜 경험치 기여» 다.
+     항목별은 영웅 단위 경험치가 리플레이에 없어서, 그 항목을 만드는 «사건 수»
+     (돌격병 막타 · 용병 막타 · 처치 관여 · 구조물 막타)로 나눈다.
+     비율의 뜻이 다르므로 파이 제목에 무엇을 센 것인지 적는다. */
+const PIE_SRC = {
+  minion:  { ko:'돌격병 막타',   pick:(ka)=>ka.filter(k=>k[3]==='minion').length },
+  creep:   { ko:'용병 막타',     pick:(ka)=>ka.filter(k=>k[3]==='merc').length },
+  struct:  { ko:'구조물 막타',   pick:(ka)=>ka.filter(k=>k[3]==='struct').length },
+  hero:    { ko:'처치 관여',     td:true },
+};
+function pieSlices(vals, colors){
+  const tot = vals.reduce((a,v)=>a+v.n, 0);
+  if(!tot) return null;
+  let acc = 0;
+  const stops = vals.map((v,i)=>{
+    const a = acc/tot*100; acc += v.n; const b = acc/tot*100;
+    return `${colors[i]} ${a.toFixed(2)}% ${b.toFixed(2)}%`;
+  });
+  return { css:`conic-gradient(${stops.join(',')})`, tot,
+           rows: vals.map((v,i)=>({...v, c:colors[i], p:v.n/tot*100})) };
+}
+function pieBox(title, cls, sl, fmt){
+  if(!sl) return `<div class="pieone"><div class="tt ${cls}">${title}</div>
+    <div class="lg"><b>자료 없음</b></div></div>`;
+  const rows = sl.rows.filter(r=>r.n>0).sort((a,b)=>b.n-a.n).slice(0,6);
+  return `<div class="pieone"><div>
+      <div class="tt ${cls}">${title}</div>
+      <div class="pie" style="background:${sl.css}"></div>
+    </div><div class="lg">` +
+    rows.map(r=>`<b title="${r.ko} — ${fmt(r.n)} (${r.p.toFixed(1)}%)">`
+      + `<i style="background:${r.c}"></i>${r.ko}<s>${r.p.toFixed(0)}%</s></b>`).join('') +
+    `</div></div>`;
+}
+/* 팀 색을 밝기로 다섯 단계 — 같은 팀 안에서 구분되게 */
+function heroColors(team){
+  const base = team ? [0.62,0.20,25] : [0.68,0.15,245];
+  return [0,1,2,3,4].map(i=>
+    `oklch(${(base[0]+i*0.07).toFixed(2)} ${(base[1]-i*0.022).toFixed(3)} ${base[2]})`);
+}
+function drawPies(kind){
+  const el = document.getElementById('xpPies');
+  if(!el) return;
+  if(!G){ el.innerHTML=''; return; }
+  const rows = (G.teamXp||[]).filter(r=>r.t<=tCur);
+  const cur = [null,null];
+  for(const r of rows) cur[r.team]=r;
+  const num = v => Math.round(v).toLocaleString();
+  let h = '';
+
+  // 1) 항목 파이 — 합계일 때만. 팀별로 지금까지 쌓인 경험치의 구성.
+  if(kind==='total' && (cur[0]||cur[1])){
+    h += `<div class="piegrp"><h4>항목 구성 <em>지금까지 쌓인 경험치</em></h4><div class="pierow">`;
+    for(const tm of [0,1]){
+      const c = cur[tm];
+      const sl = c ? pieSlices(XP_SUB.map(k=>({ko:XP_KIND[k], n:c[k]||0})),
+                               XP_SUB.map(k=>XP_COL[k])) : null;
+      h += pieBox(`${tm+1}팀 ${c?num(xpTotal(c)):''}`, tm?'r':'b', sl, num);
+    }
+    h += `</div></div>`;
+  }
+
+  // 2) 영웅 파이
+  const sc = (G.raw && G.raw.score) || {};
+  const idx = {}; Object.keys(G.players).forEach((k,i)=>{
+    const p=G.players[k]; idx[`${p.name}(${p.hero})`]=i; });
+  const byTeam = [[],[]];
+  for(const lab in G.heroes){
+    const hh=G.heroes[lab], tm = hh.team===1?1:0;
+    let n = 0;
+    if(kind==='total'){
+      n = (sc.ExperienceContribution||[])[idx[lab]] || 0;
+    }else if(kind==='trickle'){
+      n = 0;                                   // 시간 경과는 팀 전체에 붙는다 (영웅 구분 없음)
+    }else{
+      const s = PIE_SRC[kind];
+      if(s && s.td){
+        for(const e of G.evs){ if(e.t>tCur) break;
+          if(e.e==='PlayerDeath' && (e.killers||[]).includes(lab)) n++; }
+      }else if(s){
+        n = s.pick(((G.raw&&G.raw.kill_anchors||{})[lab]||[]).filter(k=>k[0]<=tCur));
+      }
+    }
+    byTeam[tm].push({ko:hh.heroName, n});
+  }
+  const src = kind==='total' ? '경험치 기여 (점수표 · 경기 최종값)'
+            : kind==='trickle' ? ''
+            : (PIE_SRC[kind] ? `${PIE_SRC[kind].ko} 수 · 지금까지` : '');
+  if(kind==='trickle'){
+    h += `<div class="piegrp"><h4>영웅 몫</h4>
+      <p class="pienote">«시간 경과» 경험치는 팀 전체에 붙는 값이라 영웅별로 나뉘지 않습니다.</p></div>`;
+  }else{
+    h += `<div class="piegrp"><h4>영웅 몫 <em>${src}</em></h4><div class="pierow">`;
+    for(const tm of [0,1]){
+      const sl = pieSlices(byTeam[tm], heroColors(tm));
+      h += pieBox(`${tm+1}팀`, tm?'r':'b', sl, num);
+    }
+    h += `</div>`;
+    if(kind!=='total')
+      h += `<p class="pienote">영웅별 «항목 경험치» 는 리플레이에 없습니다 —
+            그 항목을 만드는 사건 수로 나눈 비율입니다.</p>`;
+    h += `</div>`;
+  }
+  el.innerHTML = h;
 }
 /* 레벨 문턱값 표 — «경험치를 얼마나 모아야 몇 레벨인가».
    리플레이는 30초마다 표본만 남기므로 문턱은 구간으로만 알 수 있다 (js/data_levels.js 참고). */
