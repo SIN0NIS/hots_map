@@ -176,10 +176,16 @@ body.mode-replay.has-replay #board{display:flex}
   text-decoration:none}
 #board .pl .sk u.hot{background:var(--gold)}
 /* 수치 칸 (통계 페이지) */
-#board .pl .kda{flex:none;display:flex;flex-direction:column;align-items:center;gap:0;
-  font-family:var(--mono);font-size:calc(9px * var(--fs));line-height:1.25;min-width:44px}
-#board .pl .kda b{font-weight:600}
-#board .pl .kda em{font-style:normal;color:var(--dim);font-size:calc(8px * var(--fs));white-space:nowrap}
+/* 수치 칸 — 여러 값을 한 줄에. 카드 오른쪽에 남던 자리를 여기에 쓴다. */
+#board .pl .kda{flex:none;display:flex;gap:1px;margin:0 2px}
+#board .pl .kda s{display:flex;flex-direction:column;align-items:center;gap:0;
+  text-decoration:none;min-width:34px;padding:1px 2px;border-radius:3px;
+  background:color-mix(in oklab,var(--bg) 30%,transparent)}
+#board .pl .kda s.fin{background:color-mix(in oklab,var(--gold) 7%,transparent)}
+#board .pl .kda b{font-family:var(--mono);font-weight:600;font-size:calc(10px * var(--fs));
+  line-height:1.15}
+#board .pl .kda em{font-style:normal;color:var(--dim);font-size:calc(7px * var(--fs));
+  line-height:1.15;white-space:nowrap}
 #board .pl .kda .k{color:var(--green)} #board .pl .kda .d{color:var(--red)}
 
 /* 통계 페이지 단추 */

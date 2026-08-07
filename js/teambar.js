@@ -116,6 +116,8 @@ function buildTeamBar(){
 
     const lvEl = document.createElement('span'); lvEl.className='plv'; lvEl.textContent='1';
 
+    // 수치 여러 개를 한 줄에 늘어놓는다. 예전에는 탭으로 하나씩 갈아 끼웠는데,
+    // 카드 오른쪽에 240px 넘게 남아서 그냥 다 보이게 하는 편이 낫다.
     const kda=document.createElement('span'); kda.className='kda';
 
     if(team===0) row.append(who, tg, nc, lvEl, kda);
@@ -129,22 +131,12 @@ function buildTeamBar(){
     plCards.push(card);
   }
   applySel();
-  applyPage();
+  fillStats();
 }
 function applySel(){
   for(const c of plCards) c.card.classList.toggle('sel', c.lab===selPlayer);
 }
 
-/* --- 통계 페이지 (참고: SpazzoReplayStatKit 의 Control+1~6 방식) --- */
-let statPage='tal';
-const pageTabs=document.getElementById('pageTabs');
-const PAGE_KO={tal:'특성', kda:'관여', cs:'파밍', apm:'APM', xp:'XP'};
-pageTabs.querySelectorAll('button').forEach(b=>b.onclick=()=>{
-  statPage=b.dataset.p;
-  pageTabs.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
-  applyPage(); updateTeamBar();
-});
-function applyPage(){ fillStats(); }
 /* 지금 시각까지의 선수별 «처치 관여 / 데스».
    리플레이의 KillingPlayer 는 «관여자 목록»이라 누가 막타인지는 알 수 없다.
    그래서 킬/어시로 나누지 않고 히오스 기준인 처치 관여(Takedown)로 센다. */
@@ -205,37 +197,56 @@ function updateTeamBar(){
   updateScore();
 }
 
-/* 수치 칸 채우기 — 페이지에 따라 내용이 바뀐다 */
+/* 수치 칸 채우기 — 탭 없이 한 줄에 다 보여 준다.
+   시각을 따라 변하는 값(관여·데스·미니언·구슬·APM·사망)과 경기 최종값
+   (영웅 피해·공성 피해)을 섞어 놓되, 최종값은 «끝» 표시로 구분한다. */
+const STAT_CELLS = [
+  { k:'td',    ko:'관여',      cls:'k' },
+  { k:'death', ko:'데스',      cls:'d' },
+  { k:'cs',    ko:'미니언' },
+  { k:'globe', ko:'구슬' },
+  { k:'apm',   ko:'APM' },
+  { k:'dead',  ko:'사망',      time:true },
+  { k:'hero',  ko:'영웅딜',    fin:true },
+  { k:'siege', ko:'공성딜',    fin:true },
+];
+const kNum = v => v==null ? '-' : (v>=10000 ? (v/1000).toFixed(0)+'k'
+                                : v>=1000 ? (v/1000).toFixed(1)+'k' : String(v));
+const kTime = s => s ? `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}` : '-';
+
 function fillStats(){
   if(!G || !plCards.length) return;
-  const kda = statPage==='kda' ? kdaAt() : null;
+  const kda = kdaAt();
   const min = Math.max(1, Math.floor(tCur/60));
+  const sc  = (G.raw && G.raw.score) || {};
+  const idx = {};                       // 라벨 -> 점수표에서의 자리
+  Object.keys(G.players).forEach((k,i)=>{
+    const p=G.players[k]; idx[`${p.name}(${p.hero})`]=i;
+  });
   for(const c of plCards){
+    const v = kda[c.lab] || {td:0,d:0};
+    // 그때까지 잡은 것 · 주운 구슬 (되감으면 그 시각까지의 값)
+    let cs=0, globe=0;
+    for(const k of ((G.raw&&G.raw.kill_anchors||{})[c.lab]||[])){
+      if(k[0]>tCur) break;
+      if(k[3]==='minion') cs++;
+    }
+    for(const t of ((G.raw&&G.raw.globes||{})[c.lab]||[])){ if(t>tCur) break; globe++; }
+    const b=(G.apm||{})[c.lab]||{};
+    let tot=0; for(const m in b){ if(+m<min) tot+=b[m]; }
+    const i = idx[c.lab];
+    const val = {
+      td: v.td, death: v.d, cs, globe,
+      apm: Math.round(tot/min), dead: deadSecs(c.hh),
+      hero:  i!=null ? (sc.HeroDamage||[])[i]  : null,
+      siege: i!=null ? (sc.SiegeDamage||[])[i] : null,
+    };
     let h='';
-    if(statPage==='tal'){
-      // 특성 페이지에서는 지금 레벨만 조용히 보여 준다
-      h=`<b>${c.lv}</b><em>레벨</em>`;
-    }else if(statPage==='kda'){
-      const v=kda[c.lab]||{td:0,d:0};
-      h=`<b><s class="k">${v.td}</s> / <s class="d">${v.d}</s></b><em>관여/데스</em>`;
-    }else if(statPage==='cs'){
-      // 지금 시각까지 «막타로 잡은 것» 과 «주운 재생구슬». 둘 다 시각이 붙어 있어
-      // 되감아도 그때까지의 값이 나온다.
-      const ka=(G.raw&&G.raw.kill_anchors||{})[c.lab]||[];
-      let cs=0, mc=0;
-      for(const k of ka){ if(k[0]>tCur) break;
-        if(k[3]==='minion') cs++; else if(k[3]==='merc') mc++; }
-      let gl=0;
-      for(const t of ((G.raw&&G.raw.globes||{})[c.lab]||[])){ if(t>tCur) break; gl++; }
-      h=`<b>${cs}</b><em>미니언${mc?' · 용병 '+mc:''} · 구슬 ${gl}</em>`;
-    }else if(statPage==='apm'){
-      const b=(G.apm||{})[c.lab]||{};
-      let tot=0; for(const m in b){ if(+m<min) tot+=b[m]; }
-      const dead=deadSecs(c.hh);
-      h=`<b>${Math.round(tot/min)}</b><em>apm · ${Math.floor(dead/60)}:${String(dead%60).padStart(2,'0')}</em>`;
-    }else if(statPage==='xp'){
-      const x=(G.xpEnd||{})[c.lab];
-      h = x ? `<b>${(x/1000).toFixed(1)}k</b><em>경험치</em>` : '<b>-</b>';
+    for(const s of STAT_CELLS){
+      const raw = val[s.k];
+      if(s.fin && raw==null) continue;
+      h += `<s class="${s.fin?'fin':''}" title="${s.ko}${s.fin?' — 경기 최종값 (되감아도 안 바뀐다)':''}">`
+         + `<b class="${s.cls||''}">${s.time?kTime(raw):kNum(raw)}</b><em>${s.ko}</em></s>`;
     }
     if(c.kda.innerHTML!==h) c.kda.innerHTML=h;
   }
