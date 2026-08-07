@@ -28,10 +28,11 @@ function talentInfo(name){
 const SHARED_ABIL = new Set([22,23,26,41,45,66,77,110,111,115,172,788,789,796,137,138]);
 const SK_SLOTS = 5;
 
-function buildTeamBar(){
-  plCards = []; selPlayer = null;
-  teamEls.forEach(el=>el.replaceChildren());
-  if(!G) return;
+/* 선수별 «티어 -> 고른 특성» 표. 스코어보드·이벤트 로그·타임라인이 같이 쓰므로
+   한 번만 만들어 G 에 붙여 둔다. 티어를 모르는 특성은 남은 칸에 순서대로 채운다. */
+function teamPicks(){
+  if(!G) return {pickMap:{}, levels:{}};
+  if(G._picks) return G._picks;
   const picks = {}, levels = {};
   for(const e of G.evs){
     if(e.e==='TalentChosen' && e.player){
@@ -43,7 +44,6 @@ function buildTeamBar(){
   }
   for(const k in picks) picks[k].sort((a,b)=>a.t-b.t);
   for(const k in levels) levels[k].sort((a,b)=>a.t-b.t);
-  // 티어별로 하나씩 꽂는다. 티어를 모르는 특성은 남은 칸에 순서대로 채운다.
   const pickMap = {};
   for(const lab in picks){
     const m = {}, rest = [];
@@ -51,6 +51,14 @@ function buildTeamBar(){
     for(const tier of TIERS) if(!m[tier] && rest.length) m[tier]=rest.shift();
     pickMap[lab] = m;
   }
+  return (G._picks = {pickMap, levels});
+}
+
+function buildTeamBar(){
+  plCards = []; selPlayer = null;
+  teamEls.forEach(el=>el.replaceChildren());
+  if(!G) return;
+  const {pickMap, levels} = teamPicks();
 
   for(const lab in G.heroes){
     const hh = G.heroes[lab];

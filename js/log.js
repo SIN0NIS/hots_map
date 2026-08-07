@@ -3,7 +3,37 @@
    250줄(아이콘 <img> 포함)을 통째로 다시 만들어 그 프레임이 툭 걸렸다.
    logCount=-1 은 «처음부터 다시 그려라» 신호다 (되감기·필터 변경·리플레이 교체). */
 const logEl=document.getElementById('log');
-const filters={kill:true,struct:true,merc:true,obj:true,grow:false,misc:true};
+const filters={kill:true,struct:true,merc:true,obj:true,grow:true,misc:true};
+
+/* 레벨·특성을 «팀 + 레벨» 한 줄로 묶는다.
+   팀 레벨은 다섯 명이 같이 오르고, 특성도 같은 티어에서 갈리므로
+   선수마다 한 줄씩 쓰면 같은 이야기를 다섯 번 하는 셈이 된다. */
+function growGroups(){
+  if(!G) return [];
+  if(G._growG) return G._growG;
+  const rows = {};
+  const at = (team, lv, t) => {
+    const g = (rows[team+'-'+lv] ||= {e:'TeamLevel', t, team, lv, picks:[]});
+    if(t < g.t) g.t = t;
+    return g;
+  };
+  for(const e of G.evs){
+    if(e.e!=='LevelUp' || !e.player || e.Level==null) continue;
+    const tm = teamOf(e.player, G.players);
+    if(tm===0 || tm===1) at(tm, +e.Level, e.t);
+  }
+  const {pickMap} = (typeof teamPicks==='function') ? teamPicks() : {pickMap:{}};
+  for(const lab in pickMap){
+    const tm = teamOf(lab, G.players); if(tm!==0 && tm!==1) continue;
+    for(const tier of TIERS){
+      const p = pickMap[lab][tier]; if(!p) continue;
+      at(tm, tier, p.t).picks.push({hero:(G.heroes[lab]||{}).heroName||lab, ko:p.ko, ic:p.ic, t:p.t});
+    }
+  }
+  const out = Object.values(rows).sort((a,b)=>a.t-b.t);
+  for(const g of out) g.picks.sort((a,b)=>a.t-b.t);
+  return (G._growG = out);
+}
 let logCount=-1;
 const LOG_MAX=250;              // 화면에 유지할 최대 줄 수
 const logCntEl=document.getElementById('logCnt');
@@ -18,7 +48,9 @@ function evRow(e){
   return d;
 }
 function logRebuild(){
-  flt=G.evs.filter(e=>filters[CAT(e)]??true);
+  // 레벨·특성만 묶은 줄로 갈아 끼운다 (나머지는 원본 그대로)
+  flt=G.evs.filter(e=>CAT(e)!=='grow' && (filters[CAT(e)]??true));
+  if(filters.grow) flt=flt.concat(growGroups()).sort((a,b)=>a.t-b.t);
   let end=0; while(end<flt.length && flt[end].t<=tCur) end++;
   const start=Math.max(0,end-LOG_MAX);
   firstShown=start; shown=end;
@@ -67,7 +99,11 @@ function renderLog(){
   }
 }
 document.querySelectorAll('#filters button').forEach(b=>b.onclick=()=>{
-  filters[b.dataset.f]=!filters[b.dataset.f]; b.classList.toggle('on'); logCount=-1; markDirty(); });
+  filters[b.dataset.f]=!filters[b.dataset.f]; b.classList.toggle('on');
+  logCount=-1;
+  // 아래 시간축도 같은 필터를 따른다 — 다 끄면 아무것도 안 남는다
+  if(typeof applyTlFilters==='function') applyTlFilters();
+  markDirty(); });
 
 /* 로그 패널 접기/펴기 */
 const sideEl=document.getElementById('side'), sideTgl=document.getElementById('sideTgl');

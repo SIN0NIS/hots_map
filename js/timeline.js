@@ -121,6 +121,7 @@ function buildTimeline(){
             + (guessed ? ' — 부순 팀은 진영 위치로 추론한 추정치입니다' : '');
     if(guessed) m.classList.add('est');
     m.onpointerdown = ev=>{ ev.stopPropagation(); selEvent=e; seekTo(e.t); updateTimeline(); };
+    m.dataset.cat = cat;
     tlRows[tm].appendChild(m);
     tlMarks.push({el:m, t:e.t, e});
   }
@@ -132,13 +133,54 @@ function buildTimeline(){
     sp.textContent = fmtT(s);
     tlAxis.appendChild(sp);
   }
+  buildTierLines(T);
+  applyTlFilters();
   tlBuilt = true;
   updateTimeline();
 }
+/* 특성 티어를 세로선으로 — 아이콘으로 찍으면 열네 개가 줄을 뒤덮는다.
+   팀마다 1·4·7·10·13·16·20 레벨에서 «처음 특성을 찍은 시각» 에 자기 팀 색 선을 세운다.
+   (팀 레벨은 다섯 명이 같이 오르므로 선 하나로 팀 전체를 말할 수 있다) */
+let tierLines = [];
+function buildTierLines(T){
+  tierLines = [];
+  const {pickMap} = (typeof teamPicks==='function') ? teamPicks() : {pickMap:{}};
+  const got = [{}, {}];
+  for(const lab in pickMap){
+    const tm = teamOf(lab, G.players); if(tm!==0 && tm!==1) continue;
+    for(const tier of TIERS){
+      const p = pickMap[lab][tier]; if(!p) continue;
+      const g = (got[tm][tier] ||= {t:p.t, who:[]});
+      if(p.t < g.t) g.t = p.t;
+      g.who.push(`${(G.heroes[lab]||{}).heroName||lab} · ${p.ko}`);
+    }
+  }
+  for(const tm of [0,1]) for(const tier of TIERS){
+    const g = got[tm][tier]; if(!g) continue;
+    const el = document.createElement('span');
+    el.className = 'tltier';
+    el.style.left = (g.t/T*100)+'%';
+    el.dataset.t = g.t;
+    el.innerHTML = `<b>${tier}</b>`;
+    el.title = `${tm+1}팀 ${tier}레벨 특성 · ${fmtT(g.t)}\n` + g.who.join('\n');
+    tlRows[tm].appendChild(el);
+    tierLines.push({el, t:g.t, tm});
+  }
+}
+/* 로그 필터를 그대로 따른다 — 다 끄면 시간축도 텅 빈다 */
+function applyTlFilters(){
+  for(const m of tlMarks){
+    const on = filters[m.el.dataset.cat] ?? true;
+    m.el.classList.toggle('off', !on);
+  }
+  for(const L of tierLines) L.el.classList.toggle('off', !filters.grow);
+}
+
 /* 재생 조작 막대의 «이전/다음 사건» 단추 */
 function jumpEvent(dir){
   if(!tlMarks.length) return;
-  const list = tlMarks.map(m=>m.t).sort((a,b)=>a-b);
+  const list = tlMarks.filter(m=>!m.el.classList.contains('off')).map(m=>m.t).sort((a,b)=>a-b);
+  if(!list.length) return;
   if(dir<0){ for(let i=list.length-1;i>=0;i--) if(list[i] < tCur-1){ seekTo(list[i]); return; } seekTo(0); }
   else { for(const v of list) if(v > tCur+1){ seekTo(v); return; } seekTo(G.maxT); }
 }
@@ -171,6 +213,10 @@ function updateTimeline(){
   const pct = Math.max(0, Math.min(100, tCur/G.maxT*100)) + '%';
   for(const r of tlRows) r.style.setProperty('--prog', pct);
   if(typeof drawSpanBand==='function') drawSpanBand();
+  for(const L of tierLines){
+    const future = L.t > tCur;
+    if(L.el.classList.contains('future')!==future) L.el.classList.toggle('future',future);
+  }
   for(const m of tlMarks){
     const future = m.t > tCur;
     if(m.el.classList.contains('future')!==future) m.el.classList.toggle('future',future);

@@ -268,7 +268,7 @@ const CAT = e=>{
   if(e.e==='structure_died'||e.e==='TownStructureDeath')return'struct';
   if(e.e==='JungleCampCapture')return'merc';
   if(/Tribute|Curse|Altar|Shrine|Temple|Terror|Seed|Plant|Immortal|Punisher|Payload|Doubloon|Gem|Skull|Warhead|Cannon|Blackheart|Dragon|Garden/i.test(e.e))return'obj';
-  if(e.e==='LevelUp'||e.e==='TalentChosen')return'grow';
+  if(e.e==='LevelUp'||e.e==='TalentChosen'||e.e==='TeamLevel')return'grow';
   return 'misc';
 };
 const fmtT = s=>String(Math.floor(s/60)).padStart(2,'0')+":"+String(Math.floor(s%60)).padStart(2,'0');
@@ -314,8 +314,19 @@ function evHTML(e, players){
     case 'merc':{ ic='⚔️'; body=`${span((e.CampType||'용병'), tm(e.TeamID))} 점령 <span class="dim">(캠프 ${e.CampID??'?'} · ${tm(e.TeamID)===0?'1팀':'2팀'})</span>`; break; }
     case 'obj':{ ic='🪶'; body=`<b class="g">${e.e}</b>` + (e.TeamID?` <span class="dim">${tm(e.TeamID)===0?'1팀':'2팀'}</span>`:''); break; }
     case 'grow':{ ic='⬆';
-      body = e.e==='LevelUp' ? `${nameHTML(e.player??'?',players)} <span class="dim">레벨 ${e.Level??''}</span>`
-           : `${nameHTML(e.player??'?',players)} <span class="dim">특성: ${e.PurchaseName??''}</span>`; break; }
+      // 레벨은 팀 공통이고 특성도 같은 티어에서 갈리므로 «팀 한 줄» 로 묶어 둔다
+      // (선수마다 찍으면 데모 한 판이 195줄이 된다 -> 46줄).
+      if(e.e==='TeamLevel'){
+        body = span((e.team?'2팀':'1팀'), e.team) + ` <b class="g">레벨 ${e.lv}</b>`
+             + (e.picks.length ? ` <span class="talstrip">` + e.picks.map(p=>
+                 `<span class="tp" title="${p.hero} · ${p.ko}">`
+                 + (p.ic?`<img src="talents/${p.ic}.webp" alt="">`:'')
+                 + `${p.hero}</span>`).join('') + `</span>` : '');
+      }else{
+        body = e.e==='LevelUp' ? `${nameHTML(e.player??'?',players)} <span class="dim">레벨 ${e.Level??''}</span>`
+             : `${nameHTML(e.player??'?',players)} <span class="dim">특성: ${e.PurchaseName??''}</span>`;
+      }
+      break; }
     default:{ body=`<b class="g">${e.e}</b>`; }
   }
   return `<span class="t">${fmtT(e.t)}</span><span class="ic">${ic}</span><span>${body}</span>`;
