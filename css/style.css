@@ -296,6 +296,7 @@ body.mode-replay.has-replay #timeline{display:flex}
 #controls .spd.on{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-soft)}
 #controls .evnav{font-size:calc(12px * var(--fs));padding:3px 8px;border-radius:4px;color:var(--dim)}
 #controls .evnav:hover{color:var(--gold);border-color:var(--gold-dim)}
+#controls .evnav.on{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-soft)}
 
 /* ---- 팬줌 스테이지 ---- */
 #stage{flex:1;position:relative;min-height:0;overflow:hidden;border:1px solid var(--line);

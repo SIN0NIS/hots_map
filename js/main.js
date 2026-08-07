@@ -76,6 +76,7 @@ function tick(ts){
         seek.value=tCur/G.maxT*100;
         clock.firstChild.textContent=fmtT(tCur);
         renderLog(); updateTeamBar(); updateTimeline(); drawXp();
+        if(typeof updateSpanLive==='function') updateSpanLive();
       }
       draw();
     }

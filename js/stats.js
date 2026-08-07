@@ -9,6 +9,12 @@
    찍은 구간은 타임라인에 금색 띠로 남는다. */
 
 let markA = null, markB = null;
+/* «지금까지» 모드 — 구간을 0 ~ 재생 시각으로 잡고 재생을 따라 계속 다시 센다.
+   구간 합계를 낼 수 있으면 처음부터 지금까지도 낼 수 있다는, 당연한 이야기다.
+   덕분에 상단바에 안 들어가는 팀 단위 값(건물·용병·목표·경험치 항목별·레벨)도
+   재생을 따라 실시간으로 오른다. */
+let spanLive = false;
+let spanLastT = -1;
 
 /* 구간 안의 사건만 세기 위한 도우미 */
 const inSpan = (t, a, b) => t >= a && t <= b;
@@ -91,14 +97,28 @@ function drawSpanBand(){
 
 function openSpan(){
   if(!G) return;
-  const a = markA != null ? markA : 0;
-  const b = markB != null ? markB : tCur;
+  const a = spanLive ? 0 : (markA != null ? markA : 0);
+  const b = spanLive ? tCur : (markB != null ? markB : tCur);
   if(b - a < 1){ setStatus('구간이 너무 짧습니다 — [ 와 ] 로 양끝을 찍으세요'); return; }
-  spanTitle.textContent = `${fmtT(a)} ~ ${fmtT(b)}  (${Math.round(b-a)}초)`;
+  spanTitle.textContent = spanLive
+    ? `처음부터 지금까지 · 00:00 ~ ${fmtT(b)}`
+    : `${fmtT(a)} ~ ${fmtT(b)}  (${Math.round(b-a)}초)`;
   spanBody.innerHTML = spanHTML(a, b);
   spanModal.hidden = false;
+  spanLastT = tCur;
+  document.getElementById('spanLive').classList.toggle('on', spanLive);
 }
 function closeSpan(){ spanModal.hidden = true; }
+
+/* 재생 루프가 매 프레임 부른다. «지금까지» 모드일 때만, 그리고 0.5초 넘게
+   움직였을 때만 다시 센다 — 매 프레임 표를 새로 만들면 재생이 무거워진다. */
+function updateSpanLive(){
+  if(!spanLive || spanModal.hidden || !G) return;
+  if(Math.abs(tCur - spanLastT) < 0.5) return;
+  spanLastT = tCur;
+  spanTitle.textContent = `처음부터 지금까지 · 00:00 ~ ${fmtT(tCur)}`;
+  spanBody.innerHTML = spanHTML(0, Math.max(1, tCur));
+}
 
 function spanHTML(a, b){
   const teams = [0, 1];
@@ -162,7 +182,8 @@ function spanHTML(a, b){
 
 document.getElementById('spanA').onclick = () => setMark('a');
 document.getElementById('spanB').onclick = () => setMark('b');
-document.getElementById('spanGo').onclick = openSpan;
+document.getElementById('spanGo').onclick = () => { spanLive = false; openSpan(); };
+document.getElementById('spanLive').onclick = () => { spanLive = !spanLive; openSpan(); };
 document.getElementById('spanClose').onclick = closeSpan;
 document.getElementById('spanClear').onclick = clearMarks;
 spanModal.onclick = e => { if(e.target === spanModal) closeSpan(); };
@@ -172,6 +193,9 @@ window.addEventListener('keydown', e => {
   if(typeof isTypingTarget==='function' && isTypingTarget()) return;
   if(e.key === '[') { e.preventDefault(); setMark('a'); }
   else if(e.key === ']') { e.preventDefault(); setMark('b'); }
-  else if(e.key === '\\') { e.preventDefault(); spanModal.hidden ? openSpan() : closeSpan(); }
+  else if(e.key === '\\') { e.preventDefault();
+    if(spanModal.hidden){ spanLive = false; openSpan(); } else closeSpan(); }
+  else if(e.key === '=' || e.key === '+') { e.preventDefault();   // 처음부터 지금까지
+    spanLive = true; openSpan(); }
   else if(e.key === 'Escape' && !spanModal.hidden) { closeSpan(); e.stopPropagation(); }
 });
